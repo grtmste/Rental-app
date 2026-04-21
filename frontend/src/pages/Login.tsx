@@ -20,7 +20,7 @@ export default function Login() {
       toast.success('Welcome back!')
       navigate('/app/dashboard')
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Invalid email or password'
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Invalid email or password'
       setError(msg)
       toast.error(msg)
     } finally {
