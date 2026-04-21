@@ -4,9 +4,11 @@ const { sendInvoiceEmail } = require('../utils/emailService');
 const getAll = async (req, res, next) => {
   try {
     const result = await pool.query(`
-      SELECT i.*, c.name AS client_name, c.company AS client_company, c.email AS client_email
+      SELECT i.*, c.name AS client_name, c.company AS client_company, c.email AS client_email,
+             p.name AS project_name
       FROM invoices i
       LEFT JOIN clients c ON i.client_id = c.id
+      LEFT JOIN projects p ON i.project_id = p.id
       ORDER BY i.created_at DESC
     `);
     res.json(result.rows);

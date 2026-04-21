@@ -2,9 +2,16 @@ const pool = require('../config/database');
 
 const getAll = async (req, res, next) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM clients ORDER BY name ASC'
-    );
+    const result = await pool.query(`
+      SELECT c.*,
+        COUNT(DISTINCT p.id) AS project_count,
+        COALESCE(SUM(i.total) FILTER (WHERE i.status IN ('sent','paid')), 0) AS total_revenue
+      FROM clients c
+      LEFT JOIN projects p ON p.client_id = c.id
+      LEFT JOIN invoices i ON i.client_id = c.id
+      GROUP BY c.id
+      ORDER BY c.name ASC
+    `);
     res.json(result.rows);
   } catch (err) {
     next(err);
