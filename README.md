@@ -4,6 +4,24 @@ A full-stack SaaS web application for managing equipment rentals, crew schedulin
 
 ---
 
+## Admin Access
+
+The backend **automatically creates the admin account on first startup** — no manual database steps required.
+
+| Field    | Value                    |
+|----------|--------------------------|
+| Email    | admin@stereosound.ee     |
+| Password | admin123                 |
+| Role     | Admin                    |
+
+**How to log in:**
+1. Visit the site — you'll see the dark splash screen with "STEREO SOUND"
+2. Click the small **ADMIN** button in the top-right corner
+3. Enter the credentials above
+4. You're taken directly into the dashboard
+
+---
+
 ## Tech Stack
 
 | Layer      | Technology                              |
