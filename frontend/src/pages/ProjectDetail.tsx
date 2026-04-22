@@ -662,6 +662,7 @@ export default function ProjectDetail() {
 
       {/* Overview tab */}
       {tab === 'overview' && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
             <h3 className="font-semibold text-gray-900">Projekti andmed</h3>
@@ -691,36 +692,8 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        {/* Equipment summary */}
-        {(() => {
-          const totalQty = equipment.reduce((sum, e) => sum + e.quantity, 0)
-          const overbookedCount = equipment.filter(e => e.is_overbooked).length
-          return (
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900 mb-3">Seadmete kokkuvõte</h3>
-              {equipment.length === 0 ? (
-                <p className="text-sm text-gray-400">Seadmeid pole lisatud</p>
-              ) : (
-                <div className="flex flex-wrap gap-6 text-sm">
-                  <div>
-                    <span className="text-gray-500">Unikaalseid seadmeid</span>
-                    <p className="font-semibold text-gray-900 text-lg">{equipment.length} seadet</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Kogus kokku</span>
-                    <p className="font-semibold text-gray-900 text-lg">Kokku: {totalQty} tk</p>
-                  </div>
-                  {overbookedCount > 0 && (
-                    <div>
-                      <span className="text-gray-500">Ülebroneeringud</span>
-                      <p className="font-semibold text-red-600 text-lg">Üle broneeritud: {overbookedCount}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })()}
+        <EquipmentSummary equipment={equipment} />
+        </>
       )}
 
       {/* Equipment tab */}
@@ -881,6 +854,38 @@ export default function ProjectDetail() {
               <button onClick={saveTask} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark">Salvesta</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── EquipmentSummary sub-component ──────────────────────────────────────────
+
+function EquipmentSummary({ equipment }: { equipment: ProjectEquipment[] }) {
+  const totalQty = equipment.reduce((sum, e) => sum + e.quantity, 0)
+  const overbookedCount = equipment.filter(e => e.is_overbooked).length
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <h3 className="font-semibold text-gray-900 mb-3">Seadmete kokkuvõte</h3>
+      {equipment.length === 0 ? (
+        <p className="text-sm text-gray-400">Seadmeid pole lisatud</p>
+      ) : (
+        <div className="flex flex-wrap gap-6 text-sm">
+          <div>
+            <span className="text-gray-500">Unikaalseid seadmeid</span>
+            <p className="font-semibold text-gray-900 text-lg">{equipment.length} seadet</p>
+          </div>
+          <div>
+            <span className="text-gray-500">Kogus kokku</span>
+            <p className="font-semibold text-gray-900 text-lg">Kokku: {totalQty} tk</p>
+          </div>
+          {overbookedCount > 0 && (
+            <div>
+              <span className="text-gray-500">Ülebroneeringud</span>
+              <p className="font-semibold text-red-600 text-lg">Üle broneeritud: {overbookedCount}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
