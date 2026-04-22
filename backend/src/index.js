@@ -25,6 +25,7 @@ app.use(require('./middleware/errorHandler'));
 async function runMigrations() {
   try {
     await pool.query(`ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS category_name VARCHAR(255)`);
+    await pool.query(`ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS stage_name VARCHAR(255)`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS project_stages (
         id         SERIAL PRIMARY KEY,
