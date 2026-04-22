@@ -169,24 +169,27 @@ export default function ProjectDetail() {
   async function fetchAll() {
     setLoading(true)
     try {
-      const [pRes, eRes, cRes, tRes, sRes] = await Promise.all([
-        api.get(`/projects/${id}`),
-        api.get(`/projects/${id}/equipment`),
-        api.get(`/projects/${id}/crew`),
-        api.get(`/projects/${id}/tasks`),
-        api.get(`/projects/${id}/stages`),
-      ])
+      const pRes = await api.get(`/projects/${id}`)
       setProject(pRes.data)
       setBudgetVal(pRes.data.budget || '0')
-      setEquipment(eRes.data)
-      setCrew(cRes.data)
-      setTasks(tRes.data)
-      setStages(sRes.data)
     } catch {
       toast.error('Projekti laadimine ebaõnnestus')
-    } finally {
       setLoading(false)
+      return
     }
+
+    const [eRes, cRes, tRes, sRes] = await Promise.allSettled([
+      api.get(`/projects/${id}/equipment`),
+      api.get(`/projects/${id}/crew`),
+      api.get(`/projects/${id}/tasks`),
+      api.get(`/projects/${id}/stages`),
+    ])
+    if (eRes.status === 'fulfilled') setEquipment(eRes.value.data)
+    if (cRes.status === 'fulfilled') setCrew(cRes.value.data)
+    if (tRes.status === 'fulfilled') setTasks(tRes.value.data)
+    if (sRes.status === 'fulfilled') setStages(sRes.value.data)
+
+    setLoading(false)
   }
 
   async function fetchStages() {
