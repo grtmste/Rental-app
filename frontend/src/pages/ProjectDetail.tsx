@@ -462,3 +462,122 @@ export default function ProjectDetail() {
       </div>
     )
   }
+
+  // ─── Part C: Equipment Assigner render helper ─────────────────────────────────
+
+  function renderEquipmentAssigner() {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="p-4 border-b border-gray-200 font-semibold text-gray-900">
+          Lisa seadmeid laost
+        </div>
+        <div className="p-4 space-y-3">
+          {/* Search + category filter */}
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder="Otsi nime või kategooria järgi..."
+              value={eqSearch}
+              onChange={e => setEqSearch(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <select
+              value={eqCategoryFilter}
+              onChange={e => setEqCategoryFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Kõik kategooriad</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Stage selector */}
+          {stages.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Vali lava (valikuline)</label>
+              <select
+                value={selectedStageId}
+                onChange={e => setSelectedStageId(e.target.value ? Number(e.target.value) : '')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Vali lava</option>
+                {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Equipment list */}
+          <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
+            {filteredEquipment.map(eq => {
+              const isAssigned = assignedIds.has(eq.id)
+              const qty = eqQty[eq.id] || 1
+              const wouldOverbook = qty > eq.available_quantity
+              const outOfStock = eq.available_quantity <= 0 && !wouldOverbook
+              const lowStock = !wouldOverbook && !outOfStock && eq.available_quantity / eq.total_quantity <= 0.2
+
+              return (
+                <div key={eq.id} className={`px-4 py-3 ${wouldOverbook ? 'bg-yellow-50' : outOfStock ? 'bg-red-50' : lowStock ? 'bg-yellow-50' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{eq.name}</span>
+                        {eq.category_name && (
+                          <span className="text-xs text-gray-400">— {eq.category_name}</span>
+                        )}
+                        {wouldOverbook && (
+                          <span className="text-xs text-orange-600 font-medium">⚠ Üle broneeritud</span>
+                        )}
+                        {!wouldOverbook && outOfStock && (
+                          <span className="text-xs text-red-600">🚫 Laos otsas</span>
+                        )}
+                        {!wouldOverbook && lowStock && (
+                          <span className="text-xs text-yellow-600">⚠ Vähe laos</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Saadaval: {eq.available_quantity}/{eq.total_quantity} · €{Number(eq.daily_rate).toFixed(2)}/päev
+                      </div>
+                      {wouldOverbook && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          Hoiatus: kogus ületab laovaru. Seade märgitakse üle broneerituks.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Quantity input */}
+                    <div className="flex items-center gap-1">
+                      <label className="text-xs text-gray-400">Kogus</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={eqQty[eq.id] || 1}
+                        onChange={e => setEqQty(prev => ({ ...prev, [eq.id]: Number(e.target.value) }))}
+                        className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+
+                    {/* Add button */}
+                    <button
+                      onClick={() => addEquipment(eq.id)}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                        isAssigned
+                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          : wouldOverbook
+                          ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                          : 'bg-primary text-white hover:bg-primary-dark'
+                      }`}
+                    >
+                      {isAssigned ? 'Uuenda' : 'Lisa seade'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+            {filteredEquipment.length === 0 && (
+              <div className="p-4 text-center text-gray-400 text-sm">Seadmeid ei leitud</div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
