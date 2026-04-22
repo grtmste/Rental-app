@@ -6,6 +6,7 @@ import {
   XMarkIcon,
   CalendarIcon,
   CurrencyEuroIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline'
 import api from '../utils/api'
 import toast from 'react-hot-toast'
@@ -84,6 +85,8 @@ export default function Projects() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
 
   const fetchProjects = useCallback(async () => {
@@ -128,6 +131,21 @@ export default function Projects() {
       toast.error(err.response?.data?.error || err.response?.data?.message || 'Loomine ebaõnnestus')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/projects/${deleteTarget.id}`)
+      setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      toast.success('Projekt kustutatud')
+      setDeleteTarget(null)
+    } catch {
+      toast.error('Projekti kustutamine ebaõnnestus')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -177,30 +195,54 @@ export default function Projects() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map((p) => (
-            <Link
-              key={p.id}
-              to={`/app/projects/${p.id}`}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-primary transition-all"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="font-semibold text-gray-900 text-base line-clamp-2">{p.name}</h3>
-                <StatusBadge status={p.status} />
-              </div>
-              <p className="text-sm text-gray-500 mb-4">{p.client_name || 'Klient puudub'}</p>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-gray-400" />
-                  <span>{formatDate(p.start_date)} – {formatDate(p.end_date)}</span>
+            <div key={p.id} className="relative bg-white rounded-xl border border-gray-200 hover:shadow-md hover:border-primary transition-all group">
+              <Link to={`/app/projects/${p.id}`} className="block p-6">
+                <div className="flex items-start justify-between mb-3 pr-6">
+                  <h3 className="font-semibold text-gray-900 text-base line-clamp-2">{p.name}</h3>
+                  <StatusBadge status={p.status} />
                 </div>
-                {p.budget && (
+                <p className="text-sm text-gray-500 mb-4">{p.client_name || 'Klient puudub'}</p>
+                <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
-                    <CurrencyEuroIcon className="h-4 w-4 text-gray-400" />
-                    <span>€{p.budget.toLocaleString()}</span>
+                    <CalendarIcon className="h-4 w-4 text-gray-400" />
+                    <span>{formatDate(p.start_date)} – {formatDate(p.end_date)}</span>
                   </div>
-                )}
-              </div>
-            </Link>
+                  {p.budget && (
+                    <div className="flex items-center gap-2">
+                      <CurrencyEuroIcon className="h-4 w-4 text-gray-400" />
+                      <span>€{p.budget.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </Link>
+              <button
+                onClick={() => setDeleteTarget(p)}
+                className="absolute top-3 right-3 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                title="Kustuta projekt"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
           ))}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Kustuta projekt</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Kas oled kindel, et soovid projekti <strong>„{deleteTarget.name}"</strong> kustutada? Seda toimingut ei saa tagasi võtta.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+                Tühista
+              </button>
+              <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-60">
+                {deleting ? 'Kustutan...' : 'Kustuta'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
