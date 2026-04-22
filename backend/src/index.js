@@ -61,9 +61,19 @@ async function ensureAdminExists() {
 
 const PORT = process.env.PORT || 3001;
 
+function checkSmtpConfig() {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️  HOIATUS: SMTP seadistus puudub. E-kirjade saatmine ei tööta.');
+    console.warn('   Täitke SMTP_USER ja SMTP_PASS väljad failis .env');
+  } else {
+    console.log(`✅ SMTP seadistatud: ${process.env.SMTP_USER}`);
+  }
+}
+
 async function start() {
   await runMigrations();
   await ensureAdminExists();
+  checkSmtpConfig();
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
