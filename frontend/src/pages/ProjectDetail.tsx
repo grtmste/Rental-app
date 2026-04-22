@@ -247,13 +247,22 @@ export default function ProjectDetail() {
 
   // ─── Equipment actions ────────────────────────────────────────────────────────
 
+  async function updateEquipmentStage(itemId: number, newStageId: number | null) {
+    try {
+      await api.put(`/projects/${id}/equipment/${itemId}`, { stage_id: newStageId })
+      fetchAll()
+    } catch {
+      toast.error('Lava muutmine ebaõnnestus')
+    }
+  }
+
   async function addEquipment(eqId: number) {
     const qty = eqQty[eqId] || 1
     try {
       const res = await api.post(`/projects/${id}/equipment`, {
         equipment_id: eqId,
         quantity: qty,
-        stage_id: selectedStageId || null,
+        stage_id: null,
       })
       if (res.data.overbooked) {
         toast('Seade lisatud — kogus ületab laovaru (üle broneeritud)', { icon: '⚠️' })
@@ -494,21 +503,6 @@ export default function ProjectDetail() {
             </select>
           </div>
 
-          {/* Stage selector */}
-          {stages.length > 0 && (
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Vali lava (valikuline)</label>
-              <select
-                value={selectedStageId}
-                onChange={e => setSelectedStageId(e.target.value ? Number(e.target.value) : '')}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">Vali lava</option>
-                {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-          )}
-
           {/* Equipment list */}
           <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
             {filteredEquipment.map(eq => {
@@ -608,8 +602,10 @@ export default function ProjectDetail() {
                 key={stageName}
                 stageName={stageName}
                 categoryGroups={stageGroups[stageName]}
+                stages={stages}
                 onRemove={removeEquipment}
                 onEditQty={(item) => { setEditingEqId(item.id); setEditingEqQty(item.quantity) }}
+                onChangeStage={updateEquipmentStage}
                 editingEqId={editingEqId}
                 editingEqQty={editingEqQty}
                 setEditingEqQty={setEditingEqQty}
@@ -896,8 +892,10 @@ export default function ProjectDetail() {
 interface StageSectionProps {
   stageName: string
   categoryGroups: Record<string, ProjectEquipment[]>
+  stages: Stage[]
   onRemove: (id: number) => void
   onEditQty: (item: ProjectEquipment) => void
+  onChangeStage: (itemId: number, stageId: number | null) => void
   editingEqId: number | null
   editingEqQty: number
   setEditingEqQty: (v: number) => void
@@ -905,7 +903,7 @@ interface StageSectionProps {
   onCancelEdit: () => void
 }
 
-function StageSection({ stageName, categoryGroups, onRemove, onEditQty, editingEqId, editingEqQty, setEditingEqQty, onSaveQty, onCancelEdit }: StageSectionProps) {
+function StageSection({ stageName, categoryGroups, stages, onRemove, onEditQty, onChangeStage, editingEqId, editingEqQty, setEditingEqQty, onSaveQty, onCancelEdit }: StageSectionProps) {
   const [open, setOpen] = useState(true)
   const catKeys = Object.keys(categoryGroups).sort()
 
@@ -928,11 +926,12 @@ function StageSection({ stageName, categoryGroups, onRemove, onEditQty, editingE
               </div>
               <table className="w-full text-sm table-fixed">
                 <colgroup>
-                  <col style={{ width: '35%' }} />
-                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '28%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '15%' }} />
                   <col style={{ width: '18%' }} />
-                  <col style={{ width: '22%' }} />
-                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '9%' }} />
                 </colgroup>
                 <thead className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
                   <tr>
@@ -940,6 +939,7 @@ function StageSection({ stageName, categoryGroups, onRemove, onEditQty, editingE
                     <th className="px-4 py-2 text-center font-medium">Kogus</th>
                     <th className="px-4 py-2 text-right font-medium">Hind/päev</th>
                     <th className="px-4 py-2 text-center font-medium">Staatus</th>
+                    <th className="px-4 py-2 text-center font-medium">Lava</th>
                     <th className="px-4 py-2 text-right font-medium"></th>
                   </tr>
                 </thead>
@@ -965,6 +965,16 @@ function StageSection({ stageName, categoryGroups, onRemove, onEditQty, editingE
                         ) : (
                           <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Saadaval</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={item.stage_id ?? ''}
+                          onChange={e => onChangeStage(item.id, e.target.value ? Number(e.target.value) : null)}
+                          className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-gray-700"
+                        >
+                          <option value="">— Lava —</option>
+                          {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button onClick={() => onRemove(item.id)} className="text-red-500 hover:text-red-700 text-xs">Eemalda</button>

@@ -254,16 +254,20 @@ const addEquipment = async (req, res, next) => {
     const { total_quantity, reserved_quantity } = availabilityResult.rows[0];
     const available = parseInt(total_quantity) - parseInt(reserved_quantity);
 
-    // Check if this equipment is already in this project — if so, exclude its current quantity from the reserved total
-    const currentAssignment = await pool.query(
-      'SELECT id, quantity FROM project_equipment WHERE project_id = $1 AND equipment_id = $2',
-      [id, equipment_id]
-    );
+    // Each (project_id, equipment_id, stage_id) combination is a unique row.
+    // For the null-stage bucket, upsert to avoid duplicate unassigned rows.
+    // For non-null stages, always insert a new row so the same equipment can
+    // exist on multiple stages simultaneously.
+    const nullStageBucket = !stage_id;
+    const currentAssignment = nullStageBucket
+      ? await pool.query(
+          'SELECT id, quantity FROM project_equipment WHERE project_id = $1 AND equipment_id = $2 AND stage_id IS NULL',
+          [id, equipment_id]
+        )
+      : { rows: [] };
 
     let adjustedAvailable = available;
     if (currentAssignment.rows.length > 0) {
-      // The current project's assignment is already counted in reserved_quantity only if project is confirmed/in_progress
-      // We allow updating to a new quantity
       const currentQty = parseInt(currentAssignment.rows[0].quantity);
       const projectStatusResult = await pool.query('SELECT status FROM projects WHERE id = $1', [id]);
       const projectStatus = projectStatusResult.rows[0].status;
@@ -278,10 +282,10 @@ const addEquipment = async (req, res, next) => {
     let result;
     if (currentAssignment.rows.length > 0) {
       result = await pool.query(
-        `UPDATE project_equipment SET quantity = $1, daily_rate = COALESCE($2, daily_rate), stage_id = COALESCE($3, stage_id)
-         WHERE project_id = $4 AND equipment_id = $5
+        `UPDATE project_equipment SET quantity = $1, daily_rate = COALESCE($2, daily_rate)
+         WHERE id = $3
          RETURNING *`,
-        [quantity, daily_rate || null, stage_id || null, id, equipment_id]
+        [quantity, daily_rate || null, currentAssignment.rows[0].id]
       );
     } else {
       result = await pool.query(
