@@ -11,13 +11,15 @@ import {
   BuildingOfficeIcon,
   ChartBarIcon,
   XMarkIcon,
+  TagIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 
 const navItems = [
   { label: 'Töölaud',     to: '/app/dashboard', icon: HomeIcon },
   { label: 'Projektid',   to: '/app/projects',  icon: FolderIcon },
-  { label: 'Seadmed',     to: '/app/equipment', icon: CubeIcon },
+  { label: 'Seadmed',     to: '/app/equipment',   icon: CubeIcon },
+  { label: 'Kategooriad', to: '/app/categories',  icon: TagIcon },
   { label: 'Meeskond',    to: '/app/crew',       icon: UsersIcon },
   { label: 'Kalender',    to: '/app/calendar',   icon: CalendarIcon },
   { label: 'Pakkumised',  to: '/app/quotes',     icon: DocumentTextIcon },

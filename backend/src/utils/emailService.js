@@ -4,7 +4,6 @@ function createTransporter() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
     return null;
   }
-
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT) || 587,
@@ -20,16 +19,16 @@ async function sendEmail({ to, subject, html, text }) {
   const transporter = createTransporter();
 
   if (!transporter) {
-    console.log('------- EMAIL (SMTP not configured, logging to console) -------');
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body: ${text || html}`);
+    console.log('------- E-KIRI (SMTP seadistamata, logitakse konsooli) -------');
+    console.log(`Saaja: ${to}`);
+    console.log(`Teema: ${subject}`);
+    console.log(`Sisu: ${text || html}`);
     console.log('----------------------------------------------------------------');
     return { success: true, simulated: true };
   }
 
   const mailOptions = {
-    from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+    from: `"Stereo Sound OÜ" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
     to,
     subject,
     html,
@@ -37,92 +36,102 @@ async function sendEmail({ to, subject, html, text }) {
   };
 
   const info = await transporter.sendMail(mailOptions);
-  console.log('Email sent:', info.messageId);
-  return { success: true, messageId: info.messageId };
+  console.log('E-kiri saadetud:', info.messageId);
+  return { success: true, messageId: info.messageId, simulated: false };
 }
 
-async function sendQuoteEmail(quote, client) {
-  const subject = `Quote #${quote.quote_number} from Stereo Sound`;
+async function sendQuoteEmail(quote, client, { subject: subjectOverride, message: customMessage } = {}) {
+  const emailSubject = subjectOverride || `Pakkumine ${quote.quote_number} — Stereo Sound OÜ`;
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>Quote #${quote.quote_number}</h2>
-      <p>Dear ${client.name},</p>
-      <p>Please find attached your quote for the requested rental services.</p>
-      <table style="width:100%; border-collapse: collapse; margin-top: 16px;">
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Quote Number</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${quote.quote_number}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Date</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${new Date(quote.date).toLocaleDateString()}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Due Date</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${new Date(quote.due_date).toLocaleDateString()}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Subtotal</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">€${Number(quote.subtotal).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>VAT (${quote.vat_rate}%)</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">€${Number(quote.vat_amount).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Total</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>€${Number(quote.total).toFixed(2)}</strong></td>
-        </tr>
-      </table>
-      ${quote.notes ? `<p style="margin-top: 16px;"><strong>Notes:</strong> ${quote.notes}</p>` : ''}
-      <p style="margin-top: 24px;">Please reply to this email to accept or request changes to this quote.</p>
-      <p>Best regards,<br/>Stereo Sound Team</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+      <div style="background: #1A3C6E; padding: 24px; border-radius: 8px 8px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Stereo Sound OÜ</h1>
+        <p style="color: #9ab3d4; margin: 4px 0 0;">Pakkumine ${quote.quote_number}</p>
+      </div>
+      <div style="background: white; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+        <p>Lugupeetud ${client.name},</p>
+        ${customMessage ? `<p>${customMessage}</p>` : '<p>Saadame teile pakkumise renditavate seadmete kohta.</p>'}
+        <table style="width:100%; border-collapse: collapse; margin-top: 20px;">
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Pakkumise number</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">${quote.quote_number}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Kuupäev</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">${quote.date ? new Date(quote.date).toLocaleDateString('et-EE') : '—'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Maksetähtaeg</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">${quote.due_date ? new Date(quote.due_date).toLocaleDateString('et-EE') : '—'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Vahesumma</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">€${Number(quote.subtotal).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>KM (${quote.vat_rate}%)</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">€${Number(quote.vat_amount).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Kokku</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; font-size: 18px;"><strong>€${Number(quote.total).toFixed(2)}</strong></td>
+          </tr>
+        </table>
+        ${quote.notes ? `<p style="margin-top: 20px; padding: 12px; background: #f9fafb; border-radius: 4px; border-left: 4px solid #1A3C6E;"><strong>Märkmed:</strong> ${quote.notes}</p>` : ''}
+        <p style="margin-top: 24px;">Pakkumise aktsepteerimiseks või muudatuste tegemiseks palun vastake sellele e-kirjale.</p>
+        <p>Lugupidamisega,<br/><strong>Stereo Sound OÜ meeskond</strong></p>
+      </div>
     </div>
   `;
-  const text = `Quote #${quote.quote_number}\n\nDear ${client.name},\n\nPlease review your quote.\n\nSubtotal: €${Number(quote.subtotal).toFixed(2)}\nVAT: €${Number(quote.vat_amount).toFixed(2)}\nTotal: €${Number(quote.total).toFixed(2)}\n\nBest regards,\nStereo Sound Team`;
+  const text = `Pakkumine ${quote.quote_number}\n\nLugupeetud ${client.name},\n\n${customMessage || 'Saadame teile pakkumise renditavate seadmete kohta.'}\n\nVahesumma: €${Number(quote.subtotal).toFixed(2)}\nKM: €${Number(quote.vat_amount).toFixed(2)}\nKokku: €${Number(quote.total).toFixed(2)}\n\nLugupidamisega,\nStereo Sound OÜ`;
 
-  return sendEmail({ to: client.email, subject, html, text });
+  return sendEmail({ to: client.email, subject: emailSubject, html, text });
 }
 
 async function sendInvoiceEmail(invoice, client) {
-  const subject = `Invoice #${invoice.invoice_number} from Stereo Sound`;
+  const subject = `Arve ${invoice.invoice_number} — Stereo Sound OÜ`;
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>Invoice #${invoice.invoice_number}</h2>
-      <p>Dear ${client.name},</p>
-      <p>Please find below your invoice for the completed rental services.</p>
-      <table style="width:100%; border-collapse: collapse; margin-top: 16px;">
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Invoice Number</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${invoice.invoice_number}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Date</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${new Date(invoice.date).toLocaleDateString()}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Due Date</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${new Date(invoice.due_date).toLocaleDateString()}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Subtotal</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">€${Number(invoice.subtotal).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>VAT (${invoice.vat_rate}%)</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">€${Number(invoice.vat_amount).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Total</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>€${Number(invoice.total).toFixed(2)}</strong></td>
-        </tr>
-      </table>
-      ${invoice.notes ? `<p style="margin-top: 16px;"><strong>Notes:</strong> ${invoice.notes}</p>` : ''}
-      <p style="margin-top: 24px;">Please arrange payment by the due date. Thank you for your business.</p>
-      <p>Best regards,<br/>Stereo Sound Team</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+      <div style="background: #1A3C6E; padding: 24px; border-radius: 8px 8px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Stereo Sound OÜ</h1>
+        <p style="color: #9ab3d4; margin: 4px 0 0;">Arve ${invoice.invoice_number}</p>
+      </div>
+      <div style="background: white; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+        <p>Lugupeetud ${client.name},</p>
+        <p>Saadame teile arve tehtud renditöö eest.</p>
+        <table style="width:100%; border-collapse: collapse; margin-top: 20px;">
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Arve number</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">${invoice.invoice_number}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Kuupäev</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">${invoice.date ? new Date(invoice.date).toLocaleDateString('et-EE') : '—'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Maksetähtaeg</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('et-EE') : '—'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Vahesumma</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">€${Number(invoice.subtotal).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>KM (${invoice.vat_rate}%)</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">€${Number(invoice.vat_amount).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb;"><strong>Kokku</strong></td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; font-size: 18px;"><strong>€${Number(invoice.total).toFixed(2)}</strong></td>
+          </tr>
+        </table>
+        ${invoice.notes ? `<p style="margin-top: 20px;"><strong>Märkmed:</strong> ${invoice.notes}</p>` : ''}
+        <p style="margin-top: 24px;">Palun tasuge arve tähtajaks. Aitäh!</p>
+        <p>Lugupidamisega,<br/><strong>Stereo Sound OÜ meeskond</strong></p>
+      </div>
     </div>
   `;
-  const text = `Invoice #${invoice.invoice_number}\n\nDear ${client.name},\n\nPlease review your invoice.\n\nSubtotal: €${Number(invoice.subtotal).toFixed(2)}\nVAT: €${Number(invoice.vat_amount).toFixed(2)}\nTotal: €${Number(invoice.total).toFixed(2)}\nDue Date: ${new Date(invoice.due_date).toLocaleDateString()}\n\nBest regards,\nStereo Sound Team`;
+  const text = `Arve ${invoice.invoice_number}\n\nLugupeetud ${client.name},\n\nVahesumma: €${Number(invoice.subtotal).toFixed(2)}\nKM: €${Number(invoice.vat_amount).toFixed(2)}\nKokku: €${Number(invoice.total).toFixed(2)}\nMaksetähtaeg: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('et-EE') : '—'}\n\nLugupidamisega,\nStereo Sound OÜ`;
 
   return sendEmail({ to: client.email, subject, html, text });
 }

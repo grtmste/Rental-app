@@ -97,12 +97,11 @@ const create = async (req, res, next) => {
 
     const quote = quoteResult.rows[0];
 
-    // Insert items
     for (const item of processedItems) {
       await client.query(
-        `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [quote.id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total]
+        `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total, category_name)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [quote.id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total, item.category_name || null]
       );
     }
 
@@ -164,13 +163,12 @@ const update = async (req, res, next) => {
       vatAmount = subtotal * (vatRate / 100);
       total = subtotal + vatAmount;
 
-      // Replace all items
       await dbClient.query('DELETE FROM quote_items WHERE quote_id = $1', [id]);
       for (const item of processedItems) {
         await dbClient.query(
-          `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total]
+          `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total, category_name)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total, item.category_name || null]
         );
       }
     }
@@ -226,6 +224,7 @@ const remove = async (req, res, next) => {
 const send = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { to, subject, message } = req.body;
 
     const quoteResult = await pool.query(`
       SELECT q.*, c.name AS client_name, c.email AS client_email, c.company AS client_company
@@ -239,24 +238,28 @@ const send = async (req, res, next) => {
     }
 
     const quote = quoteResult.rows[0];
+    const recipientEmail = to || quote.client_email;
 
-    if (!quote.client_email) {
-      return res.status(400).json({ error: 'Client does not have an email address.' });
+    if (!recipientEmail) {
+      return res.status(400).json({ error: 'Saaja e-posti aadress puudub.' });
     }
 
-    const client = { name: quote.client_name, email: quote.client_email };
-    const emailResult = await sendQuoteEmail(quote, client);
+    const client = { name: quote.client_name, email: recipientEmail };
+    const emailResult = await sendQuoteEmail(quote, client, { subject, message });
 
-    // Update status to 'sent'
     await pool.query('UPDATE quotes SET status = $1 WHERE id = $2', ['sent', id]);
 
     res.json({
-      message: 'Quote sent successfully.',
+      message: 'Pakkumine edukalt saadetud!',
       email: emailResult,
       quote_id: id,
-      sent_to: quote.client_email,
+      sent_to: recipientEmail,
+      simulated: emailResult.simulated || false,
     });
   } catch (err) {
+    if (err.code === 'ECONNREFUSED' || err.code === 'EAUTH' || err.responseCode >= 400) {
+      return res.status(502).json({ error: 'E-kirja saatmine ebaõnnestus. Palun kontrolli seadeid.' });
+    }
     next(err);
   }
 };

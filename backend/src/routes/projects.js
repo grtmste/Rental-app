@@ -9,6 +9,11 @@ router.post('/', auth, projectsController.create);
 router.put('/:id', auth, projectsController.update);
 router.delete('/:id', auth, projectsController.remove);
 
+// Stage sub-routes
+router.get('/:id/stages', auth, projectsController.getStages);
+router.post('/:id/stages', auth, projectsController.addStage);
+router.delete('/:id/stages/:stageId', auth, projectsController.removeStage);
+
 // Equipment sub-routes
 router.get('/:id/equipment', auth, projectsController.getEquipment);
 router.post('/:id/equipment', auth, projectsController.addEquipment);

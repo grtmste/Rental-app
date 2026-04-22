@@ -136,20 +136,81 @@ const remove = async (req, res, next) => {
   }
 };
 
+// Stage sub-resources
+const getStages = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM project_stages WHERE project_id = $1 ORDER BY sort_order ASC, name ASC',
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const addStage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Stage name is required.' });
+    const projectCheck = await pool.query('SELECT id FROM projects WHERE id = $1', [id]);
+    if (projectCheck.rows.length === 0) return res.status(404).json({ error: 'Project not found.' });
+    const result = await pool.query(
+      'INSERT INTO project_stages (project_id, name) VALUES ($1, $2) RETURNING *',
+      [id, name]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const removeStage = async (req, res, next) => {
+  try {
+    const { id, stageId } = req.params;
+    const existing = await pool.query(
+      'SELECT id FROM project_stages WHERE id = $1 AND project_id = $2',
+      [stageId, id]
+    );
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Stage not found.' });
+    await pool.query('UPDATE project_equipment SET stage_id = NULL WHERE stage_id = $1', [stageId]);
+    await pool.query('DELETE FROM project_stages WHERE id = $1', [stageId]);
+    res.json({ message: 'Stage removed.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Equipment sub-resources
 const getEquipment = async (req, res, next) => {
   try {
     const { id } = req.params;
 
     const result = await pool.query(`
-      SELECT pe.*, e.name AS equipment_name, e.condition, e.location,
+      SELECT pe.*,
+        e.name AS equipment_name, e.condition, e.location,
         e.daily_rate AS equipment_daily_rate,
+        e.total_quantity,
         COALESCE(pe.daily_rate, e.daily_rate) AS daily_rate,
-        c.name AS category_name
+        c.name AS category_name,
+        ps.name AS stage_name,
+        reserved.total_reserved,
+        (e.total_quantity < COALESCE(reserved.total_reserved, 0)) AS is_overbooked
       FROM project_equipment pe
       JOIN equipment e ON pe.equipment_id = e.id
       LEFT JOIN categories c ON e.category_id = c.id
+      LEFT JOIN project_stages ps ON pe.stage_id = ps.id
+      LEFT JOIN (
+        SELECT pe2.equipment_id, COALESCE(SUM(pe2.quantity), 0) AS total_reserved
+        FROM project_equipment pe2
+        JOIN projects p2 ON pe2.project_id = p2.id
+        WHERE p2.status IN ('confirmed', 'in_progress')
+        GROUP BY pe2.equipment_id
+      ) reserved ON pe.equipment_id = reserved.equipment_id
       WHERE pe.project_id = $1
+      ORDER BY ps.name NULLS LAST, c.name NULLS LAST, e.name
     `, [id]);
 
     res.json(result.rows);
@@ -161,7 +222,7 @@ const getEquipment = async (req, res, next) => {
 const addEquipment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { equipment_id, quantity, daily_rate } = req.body;
+    const { equipment_id, quantity, daily_rate, stage_id } = req.body;
 
     if (!equipment_id || !quantity) {
       return res.status(400).json({ error: 'equipment_id and quantity are required.' });
@@ -211,33 +272,27 @@ const addEquipment = async (req, res, next) => {
       }
     }
 
-    if (parseInt(quantity) > adjustedAvailable) {
-      return res.status(400).json({
-        error: `Not enough stock. Available quantity: ${adjustedAvailable}, requested: ${quantity}.`,
-        available: adjustedAvailable,
-      });
-    }
+    // Overbooking is allowed — warn but do not block
+    const overbooked = parseInt(quantity) > adjustedAvailable;
 
     let result;
     if (currentAssignment.rows.length > 0) {
-      // Update existing assignment
       result = await pool.query(
-        `UPDATE project_equipment SET quantity = $1, daily_rate = COALESCE($2, daily_rate)
-         WHERE project_id = $3 AND equipment_id = $4
+        `UPDATE project_equipment SET quantity = $1, daily_rate = COALESCE($2, daily_rate), stage_id = COALESCE($3, stage_id)
+         WHERE project_id = $4 AND equipment_id = $5
          RETURNING *`,
-        [quantity, daily_rate || null, id, equipment_id]
+        [quantity, daily_rate || null, stage_id || null, id, equipment_id]
       );
     } else {
-      // Insert new assignment
       result = await pool.query(
-        `INSERT INTO project_equipment (project_id, equipment_id, quantity, daily_rate)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO project_equipment (project_id, equipment_id, quantity, daily_rate, stage_id)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [id, equipment_id, quantity, daily_rate || null]
+        [id, equipment_id, quantity, daily_rate || null, stage_id || null]
       );
     }
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ ...result.rows[0], overbooked });
   } catch (err) {
     next(err);
   }
@@ -246,7 +301,7 @@ const addEquipment = async (req, res, next) => {
 const updateEquipment = async (req, res, next) => {
   try {
     const { id, itemId } = req.params;
-    const { quantity, daily_rate } = req.body;
+    const { quantity, daily_rate, stage_id } = req.body;
 
     const existing = await pool.query(
       'SELECT * FROM project_equipment WHERE id = $1 AND project_id = $2',
@@ -285,10 +340,11 @@ const updateEquipment = async (req, res, next) => {
     const result = await pool.query(
       `UPDATE project_equipment
        SET quantity = COALESCE($1, quantity),
-           daily_rate = COALESCE($2, daily_rate)
-       WHERE id = $3
+           daily_rate = COALESCE($2, daily_rate),
+           stage_id = CASE WHEN $3::int IS NOT NULL THEN $3::int ELSE stage_id END
+       WHERE id = $4
        RETURNING *`,
-      [quantity, daily_rate, itemId]
+      [quantity, daily_rate, stage_id !== undefined ? (stage_id || null) : null, itemId]
     );
 
     res.json(result.rows[0]);
@@ -527,6 +583,9 @@ module.exports = {
   create,
   update,
   remove,
+  getStages,
+  addStage,
+  removeStage,
   getEquipment,
   addEquipment,
   updateEquipment,

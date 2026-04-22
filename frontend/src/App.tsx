@@ -21,6 +21,7 @@ import InvoiceDetail from './pages/InvoiceDetail'
 import CRM from './pages/CRM'
 import ClientDetail from './pages/ClientDetail'
 import Analytics from './pages/Analytics'
+import Categories from './pages/Categories'
 
 export default function App() {
   return (
@@ -57,6 +58,7 @@ export default function App() {
               <Route path="/app/crm" element={<CRM />} />
               <Route path="/app/crm/:id" element={<ClientDetail />} />
               <Route path="/app/analytics" element={<Analytics />} />
+              <Route path="/app/categories" element={<Categories />} />
             </Route>
           </Route>
 
