@@ -22,6 +22,26 @@ app.use('/api/analytics', require('./routes/analytics'));
 
 app.use(require('./middleware/errorHandler'));
 
+async function runMigrations() {
+  try {
+    await pool.query(`ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS category_name VARCHAR(255)`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_stages (
+        id         SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        name       VARCHAR(255) NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_project_stages_project ON project_stages(project_id)`);
+    await pool.query(`ALTER TABLE project_equipment ADD COLUMN IF NOT EXISTS stage_id INTEGER REFERENCES project_stages(id) ON DELETE SET NULL`);
+    console.log('✅ Migrations applied');
+  } catch (err) {
+    console.error('⚠️  Migration error:', err.message);
+  }
+}
+
 async function ensureAdminExists() {
   try {
     const existing = await pool.query("SELECT id FROM users WHERE email = 'admin@stereosound.ee'");
@@ -41,5 +61,6 @@ async function ensureAdminExists() {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
+  await runMigrations();
   await ensureAdminExists();
 });
