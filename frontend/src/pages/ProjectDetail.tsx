@@ -119,6 +119,9 @@ export default function ProjectDetail() {
   const [editingEqId, setEditingEqId] = useState<number | null>(null)
   const [editingEqQty, setEditingEqQty] = useState(1)
 
+  const [editingCrewId, setEditingCrewId] = useState<number | null>(null)
+  const [editingCrewHours, setEditingCrewHours] = useState(0)
+
   useEffect(() => { fetchAll() }, [id])
 
   async function fetchAll() {
@@ -213,6 +216,17 @@ export default function ProjectDetail() {
       fetchAll()
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Meeskonnaliikme lisamine ebaõnnestus')
+    }
+  }
+
+  async function updateCrewHours(memberId: number, hours: number) {
+    try {
+      await api.put(`/projects/${id}/crew/${memberId}`, { hours })
+      toast.success('Tunnid uuendatud')
+      setEditingCrewId(null)
+      fetchAll()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Tundide uuendamine ebaõnnestus')
     }
   }
 
@@ -483,7 +497,17 @@ export default function ProjectDetail() {
                     <tr key={m.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium">{(m as any).crew_name || m.name}</td>
                       <td className="px-4 py-3 text-gray-500">{m.role}</td>
-                      <td className="px-4 py-3 text-right">{m.hours || 0}</td>
+                      <td className="px-4 py-3 text-right">
+                        {editingCrewId === m.id ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <input type="number" min="0" value={editingCrewHours} onChange={e => setEditingCrewHours(Number(e.target.value))} className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center" />
+                            <button onClick={() => updateCrewHours(m.id, editingCrewHours)} className="text-xs text-green-600 hover:underline">✓</button>
+                            <button onClick={() => setEditingCrewId(null)} className="text-xs text-gray-400 hover:underline">✕</button>
+                          </div>
+                        ) : (
+                          <span className="cursor-pointer hover:text-primary" onClick={() => { setEditingCrewId(m.id); setEditingCrewHours(m.hours || 0) }}>{m.hours || 0}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right">€{Number(m.rate_per_hour || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right">
                         <button onClick={() => removeCrew(m.id)} className="text-red-500 hover:text-red-700 text-xs">Eemalda</button>

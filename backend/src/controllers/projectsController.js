@@ -142,9 +142,13 @@ const getEquipment = async (req, res, next) => {
     const { id } = req.params;
 
     const result = await pool.query(`
-      SELECT pe.*, e.name AS equipment_name, e.condition, e.location, e.daily_rate AS equipment_daily_rate
+      SELECT pe.*, e.name AS equipment_name, e.condition, e.location,
+        e.daily_rate AS equipment_daily_rate,
+        COALESCE(pe.daily_rate, e.daily_rate) AS daily_rate,
+        c.name AS category_name
       FROM project_equipment pe
       JOIN equipment e ON pe.equipment_id = e.id
+      LEFT JOIN categories c ON e.category_id = c.id
       WHERE pe.project_id = $1
     `, [id]);
 
@@ -371,6 +375,34 @@ const addCrew = async (req, res, next) => {
   }
 };
 
+const updateCrew = async (req, res, next) => {
+  try {
+    const { id, memberId } = req.params;
+    const { hours, rate_per_hour } = req.body;
+
+    const existing = await pool.query(
+      'SELECT id FROM project_crew_members WHERE id = $1 AND project_id = $2',
+      [memberId, id]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Crew assignment not found.' });
+    }
+
+    const result = await pool.query(
+      `UPDATE project_crew_members
+       SET hours = COALESCE($1, hours),
+           rate_per_hour = COALESCE($2, rate_per_hour)
+       WHERE id = $3
+       RETURNING *`,
+      [hours ?? null, rate_per_hour ?? null, memberId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const removeCrew = async (req, res, next) => {
   try {
     const { id, memberId } = req.params;
@@ -501,6 +533,7 @@ module.exports = {
   removeEquipment,
   getCrew,
   addCrew,
+  updateCrew,
   removeCrew,
   getTasks,
   createTask,

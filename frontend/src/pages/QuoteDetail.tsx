@@ -85,10 +85,10 @@ export default function QuoteDetail() {
       ])
       if (projRes.data.client_id) setForm(f => ({ ...f, client_id: String(projRes.data.client_id) }))
       const eqItems: QuoteItem[] = eqRes.data.map((e: any) => ({
-        description: e.name,
+        description: e.equipment_name || e.name,
         quantity: e.quantity,
-        unit_price: Number(e.daily_rate) || 0,
-        line_total: (e.quantity || 1) * (Number(e.daily_rate) || 0),
+        unit_price: Number(e.daily_rate || e.equipment_daily_rate) || 0,
+        line_total: (e.quantity || 1) * (Number(e.daily_rate || e.equipment_daily_rate) || 0),
       }))
       if (eqItems.length > 0) setItems(eqItems)
     } catch {}

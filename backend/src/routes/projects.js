@@ -18,6 +18,7 @@ router.delete('/:id/equipment/:itemId', auth, projectsController.removeEquipment
 // Crew sub-routes
 router.get('/:id/crew', auth, projectsController.getCrew);
 router.post('/:id/crew', auth, projectsController.addCrew);
+router.put('/:id/crew/:memberId', auth, projectsController.updateCrew);
 router.delete('/:id/crew/:memberId', auth, projectsController.removeCrew);
 
 // Task sub-routes
