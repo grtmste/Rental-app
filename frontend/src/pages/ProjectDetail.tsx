@@ -926,15 +926,31 @@ function StageSection({ stageName, categoryGroups, onRemove, onEditQty, editingE
               <div className="px-6 py-2 bg-white border-b border-gray-50">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{catName}</span>
               </div>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-fixed">
+                <colgroup>
+                  <col style={{ width: '35%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '13%' }} />
+                </colgroup>
+                <thead className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-2 text-left font-medium">Seade</th>
+                    <th className="px-4 py-2 text-center font-medium">Kogus</th>
+                    <th className="px-4 py-2 text-right font-medium">Hind/päev</th>
+                    <th className="px-4 py-2 text-center font-medium">Staatus</th>
+                    <th className="px-4 py-2 text-right font-medium"></th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-gray-50">
                   {categoryGroups[catName].map(item => (
                     <tr key={item.id} className={`hover:bg-gray-50 ${item.is_overbooked ? 'bg-red-50 hover:bg-red-100' : ''}`}>
-                      <td className="px-6 py-3 font-medium">{item.equipment_name}</td>
+                      <td className="px-6 py-3 font-medium truncate">{item.equipment_name}</td>
                       <td className="px-4 py-3 text-center">
                         {editingEqId === item.id ? (
                           <div className="flex items-center justify-center gap-1">
-                            <input type="number" min="1" value={editingEqQty} onChange={e => setEditingEqQty(Number(e.target.value))} className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center" />
+                            <input type="number" min="1" value={editingEqQty} onChange={e => setEditingEqQty(Number(e.target.value))} className="w-14 border border-gray-300 rounded px-1 py-1 text-sm text-center" />
                             <button onClick={() => onSaveQty(item.id, editingEqQty)} className="text-xs text-green-600 hover:underline">✓</button>
                             <button onClick={onCancelEdit} className="text-xs text-gray-400 hover:underline">✕</button>
                           </div>
@@ -945,7 +961,7 @@ function StageSection({ stageName, categoryGroups, onRemove, onEditQty, editingE
                       <td className="px-4 py-3 text-right text-gray-600">€{Number(item.daily_rate || 0).toFixed(2)}/päev</td>
                       <td className="px-4 py-3 text-center">
                         {item.is_overbooked ? (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">Üle broneeritud</span>
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium whitespace-nowrap">Üle broneeritud</span>
                         ) : (
                           <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Saadaval</span>
                         )}
