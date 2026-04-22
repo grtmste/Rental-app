@@ -11,10 +11,16 @@ import {
 import api from '../utils/api'
 import toast from 'react-hot-toast'
 
+interface Category {
+  id: number
+  name: string
+}
+
 interface Equipment {
   id: number
   name: string
-  category: string
+  category_id: number | null
+  category_name: string | null
   total_quantity: number
   available_quantity: number
   condition: string
@@ -41,9 +47,17 @@ const conditionColors: Record<string, string> = {
   under_repair: 'bg-orange-100 text-orange-700',
 }
 
+const conditionLabels: Record<string, string> = {
+  excellent: 'Suurepärane',
+  good: 'Hea',
+  fair: 'Rahuldav',
+  poor: 'Halb',
+  under_repair: 'Remondis',
+}
+
 const EMPTY_FORM = {
   name: '',
-  category: '',
+  category_id: '',
   newCategory: '',
   total_quantity: 1,
   condition: 'good',
@@ -54,7 +68,7 @@ const EMPTY_FORM = {
 
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([])
-  const [categories, setCategories] = useState<string[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
@@ -68,26 +82,31 @@ export default function EquipmentPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
 
-  const fetchEquipment = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await api.get('/equipment')
-      const items: Equipment[] = res.data.equipment || res.data || []
+      const [eqRes, catRes] = await Promise.all([
+        api.get('/equipment'),
+        api.get('/categories'),
+      ])
+      const items: Equipment[] = eqRes.data.equipment || eqRes.data || []
       setEquipment(items)
-      const cats = Array.from(new Set(items.map((e) => e.category).filter(Boolean))) as string[]
-      setCategories(cats)
+      setCategories(catRes.data || [])
     } catch {
-      toast.error('Failed to load equipment')
+      toast.error('Seadmete laadimine ebaõnnestus')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { fetchEquipment() }, [fetchEquipment])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const filtered = equipment.filter((e) => {
     const q = search.toLowerCase()
-    const matchSearch = !q || e.name.toLowerCase().includes(q) || (e.category || '').toLowerCase().includes(q) || (e.location || '').toLowerCase().includes(q)
-    const matchCat = !filterCategory || e.category === filterCategory
+    const matchSearch = !q
+      || e.name.toLowerCase().includes(q)
+      || (e.category_name || '').toLowerCase().includes(q)
+      || (e.location || '').toLowerCase().includes(q)
+    const matchCat = !filterCategory || String(e.category_id) === filterCategory
     return matchSearch && matchCat
   })
 
@@ -101,7 +120,7 @@ export default function EquipmentPage() {
     setEditItem(item)
     setForm({
       name: item.name,
-      category: item.category || '',
+      category_id: item.category_id ? String(item.category_id) : '',
       newCategory: '',
       total_quantity: item.total_quantity,
       condition: item.condition,
@@ -116,41 +135,54 @@ export default function EquipmentPage() {
     e.preventDefault()
     setSaving(true)
     try {
-      const category = form.category === '__new__' ? form.newCategory.trim() : form.category
+      let categoryId: number | null = null
+
+      if (form.category_id === '__new__') {
+        const newName = form.newCategory.trim()
+        if (newName) {
+          const res = await api.post('/categories', { name: newName })
+          categoryId = res.data.id
+          setCategories(prev => [...prev, res.data])
+        }
+      } else if (form.category_id) {
+        categoryId = Number(form.category_id)
+      }
+
       const payload = {
         name: form.name,
-        category,
+        category_id: categoryId,
         total_quantity: Number(form.total_quantity),
         condition: form.condition,
         location: form.location,
         description: form.description,
         daily_rate: Number(form.daily_rate),
       }
+
       if (editItem) {
         await api.put(`/equipment/${editItem.id}`, payload)
-        toast.success('Equipment updated')
+        toast.success('Seade uuendatud')
       } else {
         await api.post('/equipment', payload)
-        toast.success('Equipment added')
+        toast.success('Seade lisatud')
       }
       setShowModal(false)
-      fetchEquipment()
+      fetchData()
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Save failed')
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Salvestamine ebaõnnestus')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (item: Equipment) => {
-    if (!window.confirm(`Delete "${item.name}"? This cannot be undone.`)) return
+    if (!window.confirm(`Kustuta "${item.name}"? Seda ei saa tagasi võtta.`)) return
     setDeleting(item.id)
     try {
       await api.delete(`/equipment/${item.id}`)
-      toast.success('Equipment deleted')
-      fetchEquipment()
+      toast.success('Seade kustutatud')
+      fetchData()
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Delete failed')
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Kustutamine ebaõnnestus')
     } finally {
       setDeleting(null)
     }
@@ -187,25 +219,24 @@ export default function EquipmentPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Equipment</h1>
-          <p className="text-sm text-gray-500">{equipment.length} items in inventory</p>
+          <h1 className="text-2xl font-bold text-gray-900">Seadmed</h1>
+          <p className="text-sm text-gray-500">{equipment.length} seadet laos</p>
         </div>
         <button
           onClick={openAdd}
           className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           <PlusIcon className="h-4 w-4" />
-          Add Equipment
+          Lisa seade
         </button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, category, location..."
+            placeholder="Otsi nime, kategooria, asukoha järgi..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -216,38 +247,37 @@ export default function EquipmentPage() {
           onChange={(e) => setFilterCategory(e.target.value)}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          <option value="">All Categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          <option value="">Kõik kategooriad</option>
+          {categories.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
         </select>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {filtered.length === 0 ? (
           <div className="p-12 text-center text-gray-400">
             <CubeIconOutline className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>No equipment found</p>
+            <p>Seadmeid ei leitud</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs uppercase">
-                  <th className="text-left px-6 py-3">Name</th>
-                  <th className="text-left px-6 py-3">Category</th>
-                  <th className="text-center px-6 py-3">Total</th>
-                  <th className="text-center px-6 py-3">Available</th>
-                  <th className="text-left px-6 py-3">Condition</th>
-                  <th className="text-left px-6 py-3 hidden md:table-cell">Location</th>
-                  <th className="text-right px-6 py-3 hidden lg:table-cell">Daily Rate</th>
-                  <th className="text-right px-6 py-3">Actions</th>
+                  <th className="text-left px-6 py-3">Nimi</th>
+                  <th className="text-left px-6 py-3">Kategooria</th>
+                  <th className="text-center px-6 py-3">Kokku</th>
+                  <th className="text-center px-6 py-3">Saadaval</th>
+                  <th className="text-left px-6 py-3">Seisukord</th>
+                  <th className="text-left px-6 py-3 hidden md:table-cell">Asukoht</th>
+                  <th className="text-right px-6 py-3 hidden lg:table-cell">Päevamäär</th>
+                  <th className="text-right px-6 py-3">Toimingud</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
-                    <td className="px-6 py-4 text-gray-500">{item.category || '—'}</td>
+                    <td className="px-6 py-4 text-gray-500">{item.category_name || '—'}</td>
                     <td className="px-6 py-4 text-center text-gray-700">{item.total_quantity}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={availColor(item)}>
@@ -257,30 +287,30 @@ export default function EquipmentPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${conditionColors[item.condition] || 'bg-gray-100 text-gray-700'}`}>
-                        {item.condition?.replace('_', ' ') || '—'}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${conditionColors[item.condition] || 'bg-gray-100 text-gray-700'}`}>
+                        {conditionLabels[item.condition] || item.condition || '—'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500 hidden md:table-cell">{item.location || '—'}</td>
                     <td className="px-6 py-4 text-right text-gray-700 hidden lg:table-cell">
-                      {item.daily_rate ? `€${item.daily_rate.toFixed(2)}` : '—'}
+                      {item.daily_rate ? `€${Number(item.daily_rate).toFixed(2)}` : '—'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-primary hover:bg-blue-50 rounded transition-colors" title="Edit">
+                        <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-primary hover:bg-blue-50 rounded transition-colors" title="Muuda">
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setShowQR(item)} className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors" title="QR Code">
+                        <button onClick={() => setShowQR(item)} className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors" title="QR-kood">
                           <QrCodeIcon className="h-4 w-4" />
                         </button>
-                        <button onClick={() => openLogs(item)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="View Logs">
+                        <button onClick={() => openLogs(item)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Vaata logisid">
                           <ClipboardDocumentListIcon className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(item)}
                           disabled={deleting === item.id}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Delete"
+                          title="Kustuta"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>
@@ -294,43 +324,43 @@ export default function EquipmentPage() {
         )}
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Lisa/Muuda modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">{editItem ? 'Edit Equipment' : 'Add Equipment'}</h2>
+              <h2 className="text-lg font-bold text-gray-900">{editItem ? 'Muuda seadet' : 'Lisa seade'}</h2>
               <button onClick={() => setShowModal(false)} className="p-1 text-gray-400 hover:text-gray-700">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nimi *</label>
                 <input
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. Shure SM58 Microphone"
+                  placeholder="nt. Shure SM58 mikrofon"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kategooria</label>
                 <select
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  value={form.category_id}
+                  onChange={(e) => setForm({ ...form, category_id: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">Select category</option>
-                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                  <option value="__new__">+ Create new...</option>
+                  <option value="">Vali kategooria</option>
+                  {categories.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                  <option value="__new__">+ Loo uus...</option>
                 </select>
-                {form.category === '__new__' && (
+                {form.category_id === '__new__' && (
                   <input
                     type="text"
-                    placeholder="New category name"
+                    placeholder="Uue kategooria nimi"
                     value={form.newCategory}
                     onChange={(e) => setForm({ ...form, newCategory: e.target.value })}
                     className="mt-2 w-full px-3 py-2 border border-primary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -341,7 +371,7 @@ export default function EquipmentPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Quantity *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Kogus *</label>
                   <input
                     type="number"
                     required
@@ -352,7 +382,7 @@ export default function EquipmentPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Daily Rate (€)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Päevamäär (€)</label>
                   <input
                     type="number"
                     min={0}
@@ -365,38 +395,38 @@ export default function EquipmentPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Seisukord</label>
                 <select
                   value={form.condition}
                   onChange={(e) => setForm({ ...form, condition: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="excellent">Excellent</option>
-                  <option value="good">Good</option>
-                  <option value="fair">Fair</option>
-                  <option value="poor">Poor</option>
-                  <option value="under_repair">Under Repair</option>
+                  <option value="excellent">Suurepärane</option>
+                  <option value="good">Hea</option>
+                  <option value="fair">Rahuldav</option>
+                  <option value="poor">Halb</option>
+                  <option value="under_repair">Remondis</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Asukoht</label>
                 <input
                   value={form.location}
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. Warehouse A, Shelf 3"
+                  placeholder="nt. Ladu A, Riiul 3"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kirjeldus</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Optional notes or description"
+                  placeholder="Valikulised märkmed või kirjeldus"
                 />
               </div>
 
@@ -406,14 +436,14 @@ export default function EquipmentPage() {
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  Tühista
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
                   className="px-4 py-2 text-sm bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-60"
                 >
-                  {saving ? 'Saving...' : editItem ? 'Save Changes' : 'Add Equipment'}
+                  {saving ? 'Salvestamine...' : editItem ? 'Salvesta muudatused' : 'Lisa seade'}
                 </button>
               </div>
             </form>
@@ -421,39 +451,39 @@ export default function EquipmentPage() {
         </div>
       )}
 
-      {/* QR Code Modal */}
+      {/* QR-koodi modal */}
       {showQR && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">QR Code</h2>
+              <h2 className="text-lg font-bold text-gray-900">QR-kood</h2>
               <button onClick={() => setShowQR(null)} className="p-1 text-gray-400 hover:text-gray-700">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
             <div className="p-6 text-center">
               {showQR.qr_code ? (
-                <img src={`data:image/png;base64,${showQR.qr_code}`} alt="QR Code" className="mx-auto mb-4 w-48 h-48" />
+                <img src={`data:image/png;base64,${showQR.qr_code}`} alt="QR-kood" className="mx-auto mb-4 w-48 h-48" />
               ) : (
-                <div className="w-48 h-48 mx-auto bg-gray-100 rounded-xl flex items-center justify-center mb-4">
+                <div className="w-48 h-48 mx-auto bg-gray-100 rounded-xl flex items-center justify-center mb-4 flex-col">
                   <QrCodeIcon className="h-16 w-16 text-gray-300" />
-                  <p className="text-xs text-gray-400 mt-2">No QR code</p>
+                  <p className="text-xs text-gray-400 mt-2">QR-koodi ei ole</p>
                 </div>
               )}
               <p className="font-semibold text-gray-900">{showQR.name}</p>
-              <p className="text-sm text-gray-500">{showQR.category}</p>
+              <p className="text-sm text-gray-500">{showQR.category_name}</p>
               <p className="text-xs text-gray-400 mt-1">ID: {showQR.id}</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Logs Modal */}
+      {/* Logide modal */}
       {showLogs && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Usage Logs — {showLogs.name}</h2>
+              <h2 className="text-lg font-bold text-gray-900">Kasutuslogid — {showLogs.name}</h2>
               <button onClick={() => setShowLogs(null)} className="p-1 text-gray-400 hover:text-gray-700">
                 <XMarkIcon className="h-5 w-5" />
               </button>
@@ -464,16 +494,16 @@ export default function EquipmentPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : logs.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">No logs found</div>
+                <div className="p-8 text-center text-gray-400">Logisid ei leitud</div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 text-xs uppercase">
-                      <th className="text-left px-6 py-3">Action</th>
-                      <th className="text-center px-6 py-3">Qty</th>
-                      <th className="text-left px-6 py-3">Project</th>
-                      <th className="text-left px-6 py-3">User</th>
-                      <th className="text-left px-6 py-3">Date</th>
+                      <th className="text-left px-6 py-3">Toiming</th>
+                      <th className="text-center px-6 py-3">Kogus</th>
+                      <th className="text-left px-6 py-3">Projekt</th>
+                      <th className="text-left px-6 py-3">Kasutaja</th>
+                      <th className="text-left px-6 py-3">Kuupäev</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -481,7 +511,7 @@ export default function EquipmentPage() {
                       <tr key={log.id} className="hover:bg-gray-50">
                         <td className="px-6 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${log.action === 'check_out' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
-                            {log.action?.replace('_', ' ')}
+                            {log.action === 'check_out' ? 'Väljas' : 'Tagastatud'}
                           </span>
                         </td>
                         <td className="px-6 py-3 text-center">{log.quantity}</td>
@@ -503,7 +533,6 @@ export default function EquipmentPage() {
   )
 }
 
-// Inline icon to avoid import issues
 function CubeIconOutline({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

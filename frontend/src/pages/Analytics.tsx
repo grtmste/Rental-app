@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 
@@ -35,7 +35,7 @@ export default function Analytics() {
       setTopClients(clientRes.data)
       setCrewHours(crewRes.data)
     } catch {
-      toast.error('Failed to load analytics')
+      toast.error('Analüütika laadimine ebaõnnestus')
     } finally {
       setLoading(false)
     }
@@ -46,17 +46,16 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Analytics & Reports</h1>
-        <p className="text-gray-500 text-sm mt-1">Business performance overview</p>
+        <h1 className="text-2xl font-bold text-gray-900">Analüütika ja aruanded</h1>
+        <p className="text-gray-500 text-sm mt-1">Ettevõtte tulemuslikkuse ülevaade</p>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: `€${Number(overview?.total_revenue || 0).toLocaleString('et-EE', { minimumFractionDigits: 2 })}`, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Total Projects', value: overview?.total_projects || 0, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Active Projects', value: overview?.active_projects || 0, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Equipment Utilization', value: `${Number(overview?.equipment_utilization || 0).toFixed(1)}%`, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Tulu kokku', value: `€${Number(overview?.total_revenue || 0).toLocaleString('et-EE', { minimumFractionDigits: 2 })}`, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Projektid kokku', value: overview?.total_projects || 0, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Aktiivsed projektid', value: overview?.active_projects || 0, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Seadmete kasutusaste', value: `${Number(overview?.equipment_utilization || 0).toFixed(1)}%`, color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map(card => (
           <div key={card.label} className="bg-white rounded-lg border border-gray-200 p-5">
             <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${card.bg} mb-3`}>
@@ -70,51 +69,48 @@ export default function Analytics() {
         ))}
       </div>
 
-      {/* Revenue Chart */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Revenue — Last 12 Months</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Tulu — viimased 12 kuud</h3>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={revenue}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="month" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} tickFormatter={v => `€${v}`} />
-            <Tooltip formatter={(v: number) => [`€${Number(v).toFixed(2)}`, 'Revenue']} />
+            <Tooltip formatter={(v: number) => [`€${Number(v).toFixed(2)}`, 'Tulu']} />
             <Line type="monotone" dataKey="revenue" stroke="#1A3C6E" strokeWidth={2} dot={{ fill: '#1A3C6E', r: 4 }} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Equipment Utilization */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Equipment Utilization</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">Seadmete kasutusaste</h3>
           {equipment.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-8">No utilization data yet</p>
+            <p className="text-gray-400 text-sm text-center py-8">Kasutusandmed puuduvad</p>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={equipment.slice(0, 10)} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `${v}%`} domain={[0, 100]} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                <Tooltip formatter={(v: number) => [`${Number(v).toFixed(1)}%`, 'Utilization']} />
+                <Tooltip formatter={(v: number) => [`${Number(v).toFixed(1)}%`, 'Kasutusaste']} />
                 <Bar dataKey="utilization" fill="#F97316" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Crew Hours */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Crew Hours Logged</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">Meeskonna töötunnid</h3>
           {crewHours.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-8">No crew hours data yet</p>
+            <p className="text-gray-400 text-sm text-center py-8">Töötunniandmed puuduvad</p>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={crewHours}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => [`${v}h`, 'Hours']} />
+                <Tooltip formatter={(v: number) => [`${v}t`, 'Tunnid']} />
                 <Bar dataKey="total_hours" fill="#1A3C6E" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -122,20 +118,19 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Top Clients */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Top Clients by Revenue</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Tulu järgi TOP kliendid</h3>
         {topClients.length === 0 ? (
-          <p className="text-gray-400 text-sm">No data yet</p>
+          <p className="text-gray-400 text-sm">Andmed puuduvad</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-gray-500 text-xs uppercase border-b border-gray-200">
                 <th className="pb-2 text-left">#</th>
-                <th className="pb-2 text-left">Client</th>
-                <th className="pb-2 text-left">Company</th>
-                <th className="pb-2 text-right">Projects</th>
-                <th className="pb-2 text-right">Revenue</th>
+                <th className="pb-2 text-left">Klient</th>
+                <th className="pb-2 text-left">Ettevõte</th>
+                <th className="pb-2 text-right">Projektid</th>
+                <th className="pb-2 text-right">Tulu</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

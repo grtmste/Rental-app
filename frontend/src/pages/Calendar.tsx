@@ -19,6 +19,14 @@ const STATUS_COLORS: Record<string, string> = {
   completed: '#16A34A',
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Mustand',
+  confirmed: 'Kinnitatud',
+  in_progress: 'Töös',
+  completed: 'Lõpetatud',
+  cancelled: 'Tühistatud',
+}
+
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate()
 }
@@ -26,8 +34,8 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay()
 }
 
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const MONTH_NAMES = ['Jaanuar','Veebruar','Märts','Aprill','Mai','Juuni','Juuli','August','September','Oktoober','November','Detsember']
+const DAY_NAMES = ['P','E','T','K','N','R','L']
 
 export default function Calendar() {
   const navigate = useNavigate()
@@ -39,7 +47,7 @@ export default function Calendar() {
   const [modalProjects, setModalProjects] = useState<Project[]>([])
 
   useEffect(() => {
-    api.get('/projects').then(r => setProjects(r.data)).catch(() => toast.error('Failed to load projects'))
+    api.get('/projects').then(r => setProjects(r.data.projects || r.data || [])).catch(() => toast.error('Projektide laadimine ebaõnnestus'))
   }, [])
 
   function prevMonth() {
@@ -80,13 +88,13 @@ export default function Calendar() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Kalender</h1>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm">
             {Object.entries(STATUS_COLORS).map(([s, c]) => (
               <div key={s} className="flex items-center gap-1">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c }}></div>
-                <span className="text-gray-500 capitalize">{s.replace('_', ' ')}</span>
+                <span className="text-gray-500">{STATUS_LABELS[s] || s}</span>
               </div>
             ))}
           </div>
@@ -94,7 +102,6 @@ export default function Calendar() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        {/* Calendar header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-200 transition-colors text-gray-600">
             ‹
@@ -105,21 +112,18 @@ export default function Calendar() {
           </button>
         </div>
 
-        {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-gray-200">
           {DAY_NAMES.map(d => (
             <div key={d} className="py-3 text-center text-xs font-semibold text-gray-500 uppercase">{d}</div>
           ))}
         </div>
 
-        {/* Calendar grid */}
         <div className="grid grid-cols-7">
           {Array.from({ length: totalCells }).map((_, idx) => {
             const dayNum = idx - firstDay + 1
             const isValid = dayNum >= 1 && dayNum <= daysInMonth
             const isToday = isValid && today.getFullYear() === currentYear && today.getMonth() === currentMonth && today.getDate() === dayNum
             const dayProjects = isValid ? getProjectsForDay(currentYear, currentMonth, dayNum) : []
-            const hasProjects = dayProjects.length > 0
 
             return (
               <div
@@ -144,7 +148,7 @@ export default function Calendar() {
                         </div>
                       ))}
                       {dayProjects.length > 3 && (
-                        <div className="text-xs text-gray-400 px-1">+{dayProjects.length - 3} more</div>
+                        <div className="text-xs text-gray-400 px-1">+{dayProjects.length - 3} veel</div>
                       )}
                     </div>
                   </>
@@ -155,13 +159,12 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Day modal */}
       {selectedDay && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedDay(null)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="font-semibold text-gray-900">
-                {selectedDay.day} {MONTH_NAMES[selectedDay.month]} {selectedDay.year}
+                {selectedDay.day}. {MONTH_NAMES[selectedDay.month]} {selectedDay.year}
               </h3>
               <button onClick={() => setSelectedDay(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
@@ -176,8 +179,8 @@ export default function Calendar() {
                       {p.start_date ? new Date(p.start_date).toLocaleDateString('et-EE') : ''} – {p.end_date ? new Date(p.end_date).toLocaleDateString('et-EE') : ''}
                     </div>
                     <div className="mt-1">
-                      <span className="text-xs px-2 py-0.5 rounded-full text-white capitalize" style={{ backgroundColor: STATUS_COLORS[p.status] || '#6B7280' }}>
-                        {p.status.replace('_', ' ')}
+                      <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: STATUS_COLORS[p.status] || '#6B7280' }}>
+                        {STATUS_LABELS[p.status] || p.status}
                       </span>
                     </div>
                   </div>
@@ -185,7 +188,7 @@ export default function Calendar() {
                     onClick={() => navigate(`/app/projects/${p.id}`)}
                     className="px-2 py-1 text-xs bg-primary text-white rounded hover:bg-primary-dark transition-colors flex-shrink-0"
                   >
-                    View
+                    Ava
                   </button>
                 </div>
               ))}

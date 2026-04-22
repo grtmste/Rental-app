@@ -17,10 +17,10 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      toast.success('Welcome back!')
+      toast.success('Tere tulemast tagasi!')
       navigate('/app/dashboard')
     } catch (err: any) {
-      const msg = err.response?.data?.error || err.response?.data?.message || 'Invalid email or password'
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Vale e-post või parool'
       setError(msg)
       toast.error(msg)
     } finally {
@@ -31,15 +31,14 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-block">
             <span className="text-3xl font-bold text-primary">RentPro</span>
           </Link>
-          <h2 className="mt-4 text-2xl font-bold text-gray-900">Sign in to your account</h2>
+          <h2 className="mt-4 text-2xl font-bold text-gray-900">Logi oma kontole sisse</h2>
           <p className="mt-1 text-gray-500">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-primary hover:underline font-medium">Sign up</Link>
+            Pole kontot?{' '}
+            <Link to="/register" className="text-primary hover:underline font-medium">Registreeru</Link>
           </p>
         </div>
 
@@ -52,29 +51,29 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">E-posti aadress</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoFocus
-                placeholder="you@company.com"
+                placeholder="sina@ettevote.ee"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
-                <a href="#" className="text-xs text-primary hover:underline">Forgot password?</a>
+                <label className="block text-sm font-medium text-gray-700">Parool</label>
+                <a href="#" className="text-xs text-primary hover:underline">Unustasid parooli?</a>
               </div>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="Enter your password"
+                placeholder="Sisesta parool"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
@@ -90,17 +89,17 @@ export default function Login() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  Signing in...
+                  Sisselogimine...
                 </span>
-              ) : 'Sign in'}
+              ) : 'Logi sisse'}
             </button>
           </form>
         </div>
 
         <p className="text-center mt-4 text-xs text-gray-400">
-          By signing in, you agree to our{' '}
-          <a href="#" className="underline">Terms of Service</a> and{' '}
-          <a href="#" className="underline">Privacy Policy</a>
+          Sisse logides nõustud meie{' '}
+          <a href="#" className="underline">Kasutustingimustega</a> ja{' '}
+          <a href="#" className="underline">Privaatsuspoliitikaga</a>
         </p>
       </div>
     </div>

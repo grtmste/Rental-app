@@ -18,11 +18,11 @@ export default function Register() {
     setError('')
 
     if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match')
+      setError('Paroolid ei ühti')
       return
     }
     if (form.password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError('Parool peab olema vähemalt 6 tähemärki')
       return
     }
 
@@ -34,10 +34,10 @@ export default function Register() {
         password: form.password,
         role: form.role,
       })
-      toast.success('Account created! Please sign in.')
+      toast.success('Konto loodud! Palun logi sisse.')
       navigate('/login')
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Registration failed. Please try again.'
+      const msg = err.response?.data?.message || 'Registreerimine ebaõnnestus. Palun proovi uuesti.'
       setError(msg)
       toast.error(msg)
     } finally {
@@ -52,10 +52,10 @@ export default function Register() {
           <Link to="/" className="inline-block">
             <span className="text-3xl font-bold text-primary">RentPro</span>
           </Link>
-          <h2 className="mt-4 text-2xl font-bold text-gray-900">Create your account</h2>
+          <h2 className="mt-4 text-2xl font-bold text-gray-900">Loo konto</h2>
           <p className="mt-1 text-gray-500">
-            Already have an account?{' '}
-            <Link to="/login" className="text-primary hover:underline font-medium">Sign in</Link>
+            Juba on konto?{' '}
+            <Link to="/login" className="text-primary hover:underline font-medium">Logi sisse</Link>
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export default function Register() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Täisnimi</label>
               <input
                 type="text"
                 name="name"
@@ -76,26 +76,26 @@ export default function Register() {
                 onChange={handleChange}
                 required
                 autoFocus
-                placeholder="John Smith"
+                placeholder="Jaan Tamm"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">E-posti aadress</label>
               <input
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
                 required
-                placeholder="you@company.com"
+                placeholder="sina@ettevote.ee"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Roll</label>
               <select
                 name="role"
                 value={form.role}
@@ -103,33 +103,33 @@ export default function Register() {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="staff">Staff</option>
+                <option value="manager">Haldur</option>
+                <option value="staff">Personal</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Parool</label>
               <input
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
                 required
-                placeholder="At least 6 characters"
+                placeholder="Vähemalt 6 tähemärki"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Korda parooli</label>
               <input
                 type="password"
                 name="confirmPassword"
                 value={form.confirmPassword}
                 onChange={handleChange}
                 required
-                placeholder="Repeat your password"
+                placeholder="Korda parooli"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
@@ -145,17 +145,17 @@ export default function Register() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  Creating account...
+                  Konto loomine...
                 </span>
-              ) : 'Create Account'}
+              ) : 'Loo konto'}
             </button>
           </form>
         </div>
 
         <p className="text-center mt-4 text-xs text-gray-400">
-          By creating an account, you agree to our{' '}
-          <a href="#" className="underline">Terms of Service</a> and{' '}
-          <a href="#" className="underline">Privacy Policy</a>
+          Konto luues nõustud meie{' '}
+          <a href="#" className="underline">Kasutustingimustega</a> ja{' '}
+          <a href="#" className="underline">Privaatsuspoliitikaga</a>
         </p>
       </div>
     </div>

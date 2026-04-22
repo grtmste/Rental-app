@@ -37,10 +37,27 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
+const statusLabels: Record<string, string> = {
+  draft: 'Mustand',
+  confirmed: 'Kinnitatud',
+  in_progress: 'Töös',
+  completed: 'Lõpetatud',
+  cancelled: 'Tühistatud',
+}
+
+const filterLabels: Record<string, string> = {
+  '': 'Kõik',
+  draft: 'Mustand',
+  confirmed: 'Kinnitatud',
+  in_progress: 'Töös',
+  completed: 'Lõpetatud',
+  cancelled: 'Tühistatud',
+}
+
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[status] || 'bg-gray-100 text-gray-700'}`}>
-      {status.replace('_', ' ')}
+    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status] || 'bg-gray-100 text-gray-700'}`}>
+      {statusLabels[status] || status}
     </span>
   )
 }
@@ -74,7 +91,7 @@ export default function Projects() {
       const res = await api.get('/projects')
       setProjects(res.data.projects || res.data || [])
     } catch {
-      toast.error('Failed to load projects')
+      toast.error('Projektide laadimine ebaõnnestus')
     } finally {
       setLoading(false)
     }
@@ -101,14 +118,14 @@ export default function Projects() {
         description: form.description,
       }
       const res = await api.post('/projects', payload)
-      toast.success('Project created')
+      toast.success('Projekt loodud')
       setShowModal(false)
       setForm({ ...EMPTY_FORM })
       const newId = res.data.id || res.data.project?.id
       if (newId) navigate(`/app/projects/${newId}`)
       else fetchProjects()
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Create failed')
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Loomine ebaõnnestus')
     } finally {
       setSaving(false)
     }
@@ -126,19 +143,18 @@ export default function Projects() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-          <p className="text-sm text-gray-500">{projects.length} total projects</p>
+          <h1 className="text-2xl font-bold text-gray-900">Projektid</h1>
+          <p className="text-sm text-gray-500">{projects.length} projekti kokku</p>
         </div>
         <button
           onClick={() => { setForm({ ...EMPTY_FORM }); setShowModal(true) }}
           className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           <PlusIcon className="h-4 w-4" />
-          Create Project
+          Loo projekt
         </button>
       </div>
 
-      {/* Status filter */}
       <div className="flex gap-2 flex-wrap">
         {['', 'draft', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => (
           <button
@@ -148,16 +164,15 @@ export default function Projects() {
               filterStatus === s ? 'bg-primary text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
-            {s === '' ? 'All' : s.replace('_', ' ')}
+            {filterLabels[s]}
           </button>
         ))}
       </div>
 
-      {/* Projects grid */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
           <FolderIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p>No projects found</p>
+          <p>Projekte ei leitud</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -171,7 +186,7 @@ export default function Projects() {
                 <h3 className="font-semibold text-gray-900 text-base line-clamp-2">{p.name}</h3>
                 <StatusBadge status={p.status} />
               </div>
-              <p className="text-sm text-gray-500 mb-4">{p.client_name || 'No client assigned'}</p>
+              <p className="text-sm text-gray-500 mb-4">{p.client_name || 'Klient puudub'}</p>
               <div className="space-y-2 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4 text-gray-400" />
@@ -189,36 +204,35 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Create Project Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Create Project</h2>
+              <h2 className="text-lg font-bold text-gray-900">Loo projekt</h2>
               <button onClick={() => setShowModal(false)} className="p-1 text-gray-400 hover:text-gray-700">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Projekti nimi *</label>
                 <input
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. Summer Music Festival 2024"
+                  placeholder="nt. Suvefestival 2024"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Klient</label>
                 <select
                   value={form.client_id}
                   onChange={(e) => setForm({ ...form, client_id: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">No client</option>
+                  <option value="">Klient puudub</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>{c.company ? `${c.name} (${c.company})` : c.name}</option>
                   ))}
@@ -227,7 +241,7 @@ export default function Projects() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Alguskuupäev *</label>
                   <input
                     type="date"
                     required
@@ -237,7 +251,7 @@ export default function Projects() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lõppkuupäev *</label>
                   <input
                     type="date"
                     required
@@ -250,21 +264,21 @@ export default function Projects() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Staatus</label>
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="draft">Draft</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="draft">Mustand</option>
+                    <option value="confirmed">Kinnitatud</option>
+                    <option value="in_progress">Töös</option>
+                    <option value="completed">Lõpetatud</option>
+                    <option value="cancelled">Tühistatud</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Budget (€)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Eelarve (€)</label>
                   <input
                     type="number"
                     min={0}
@@ -278,20 +292,20 @@ export default function Projects() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kirjeldus</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Project notes..."
+                  placeholder="Projekti märkmed..."
                 />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Tühista</button>
                 <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-primary hover:bg-primary-dark text-white rounded-lg disabled:opacity-60">
-                  {saving ? 'Creating...' : 'Create Project'}
+                  {saving ? 'Loomine...' : 'Loo projekt'}
                 </button>
               </div>
             </form>

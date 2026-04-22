@@ -32,7 +32,7 @@ export default function CRM() {
       const res = await api.get('/clients')
       setClients(res.data)
     } catch {
-      toast.error('Failed to load clients')
+      toast.error('Klientide laadimine ebaõnnestus')
     } finally {
       setLoading(false)
     }
@@ -51,30 +51,30 @@ export default function CRM() {
   }
 
   async function save() {
-    if (!form.name.trim()) { toast.error('Name is required'); return }
+    if (!form.name.trim()) { toast.error('Nimi on kohustuslik'); return }
     try {
       if (editingId) {
         await api.put(`/clients/${editingId}`, form)
-        toast.success('Client updated')
+        toast.success('Klient uuendatud')
       } else {
         await api.post('/clients', form)
-        toast.success('Client created')
+        toast.success('Klient lisatud')
       }
       setShowModal(false)
       fetchClients()
     } catch {
-      toast.error('Failed to save client')
+      toast.error('Salvestamine ebaõnnestus')
     }
   }
 
   async function deleteClient(id: number) {
-    if (!confirm('Delete this client? This will not delete associated projects.')) return
+    if (!confirm('Kustuta see klient? Seotud projektid jäävad alles.')) return
     try {
       await api.delete(`/clients/${id}`)
-      toast.success('Client deleted')
+      toast.success('Klient kustutatud')
       fetchClients()
     } catch {
-      toast.error('Failed to delete client')
+      toast.error('Kustutamine ebaõnnestus')
     }
   }
 
@@ -91,36 +91,36 @@ export default function CRM() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CRM — Clients</h1>
-          <p className="text-gray-500 text-sm mt-1">{clients.length} clients</p>
+          <h1 className="text-2xl font-bold text-gray-900">CRM — Kliendid</h1>
+          <p className="text-gray-500 text-sm mt-1">{clients.length} klienti</p>
         </div>
         <button onClick={openCreate} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors">
-          + Add Client
+          + Lisa klient
         </button>
       </div>
 
       <div>
-        <input type="text" placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-primary" />
+        <input type="text" placeholder="Otsi kliente..." value={search} onChange={e => setSearch(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-primary" />
       </div>
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <div className="text-5xl mb-4">🏢</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No clients yet</h3>
-          <button onClick={openCreate} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Add Client</button>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Kliente pole veel</h3>
+          <button onClick={openCreate} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Lisa klient</button>
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
-                <th className="px-4 py-3 text-left">Name</th>
-                <th className="px-4 py-3 text-left">Company</th>
-                <th className="px-4 py-3 text-left">Email</th>
-                <th className="px-4 py-3 text-left">Phone</th>
-                <th className="px-4 py-3 text-right">Projects</th>
-                <th className="px-4 py-3 text-right">Revenue</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-left">Nimi</th>
+                <th className="px-4 py-3 text-left">Ettevõte</th>
+                <th className="px-4 py-3 text-left">E-post</th>
+                <th className="px-4 py-3 text-left">Telefon</th>
+                <th className="px-4 py-3 text-right">Projektid</th>
+                <th className="px-4 py-3 text-right">Tulu</th>
+                <th className="px-4 py-3 text-right">Toimingud</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -133,8 +133,8 @@ export default function CRM() {
                   <td className="px-4 py-3 text-right text-gray-700">{c.project_count || 0}</td>
                   <td className="px-4 py-3 text-right font-medium">€{Number(c.total_revenue || 0).toLocaleString('et-EE', { minimumFractionDigits: 2 })}</td>
                   <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openEdit(c)} className="text-primary hover:underline text-xs mr-3">Edit</button>
-                    <button onClick={() => deleteClient(c.id)} className="text-red-500 hover:underline text-xs">Delete</button>
+                    <button onClick={() => openEdit(c)} className="text-primary hover:underline text-xs mr-3">Muuda</button>
+                    <button onClick={() => deleteClient(c.id)} className="text-red-500 hover:underline text-xs">Kustuta</button>
                   </td>
                 </tr>
               ))}
@@ -147,40 +147,40 @@ export default function CRM() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
-              <h3 className="font-semibold text-gray-900">{editingId ? 'Edit Client' : 'Add Client'}</h3>
+              <h3 className="font-semibold text-gray-900">{editingId ? 'Muuda klienti' : 'Lisa klient'}</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Name *</label>
+                  <label className="text-sm font-medium text-gray-700">Nimi *</label>
                   <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Company</label>
+                  <label className="text-sm font-medium text-gray-700">Ettevõte</label>
                   <input value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <label className="text-sm font-medium text-gray-700">E-post</label>
                   <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Phone</label>
+                  <label className="text-sm font-medium text-gray-700">Telefon</label>
                   <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Address</label>
+                  <label className="text-sm font-medium text-gray-700">Aadress</label>
                   <input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Notes</label>
+                  <label className="text-sm font-medium text-gray-700">Märkmed</label>
                   <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={2} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 p-4 border-t">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-              <button onClick={save} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark">Save</button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Tühista</button>
+              <button onClick={save} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark">Salvesta</button>
             </div>
           </div>
         </div>

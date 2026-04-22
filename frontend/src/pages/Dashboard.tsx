@@ -37,10 +37,18 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
+const statusLabels: Record<string, string> = {
+  draft: 'Mustand',
+  confirmed: 'Kinnitatud',
+  in_progress: 'Töös',
+  completed: 'Lõpetatud',
+  cancelled: 'Tühistatud',
+}
+
 function StatusBadge({ status }: { status: string }) {
   return (
     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status] || 'bg-gray-100 text-gray-700'}`}>
-      {status.replace('_', ' ')}
+      {statusLabels[status] || status}
     </span>
   )
 }
@@ -92,7 +100,7 @@ export default function Dashboard() {
 
   const metrics = [
     {
-      label: 'Total Projects',
+      label: 'Projektid kokku',
       value: overview?.totalProjects ?? 0,
       icon: FolderIcon,
       color: 'text-blue-600',
@@ -100,7 +108,7 @@ export default function Dashboard() {
       link: '/app/projects',
     },
     {
-      label: 'Active Equipment Items',
+      label: 'Aktiivsed seadmed',
       value: overview?.activeEquipment ?? 0,
       icon: CubeIcon,
       color: 'text-purple-600',
@@ -108,7 +116,7 @@ export default function Dashboard() {
       link: '/app/equipment',
     },
     {
-      label: 'Total Revenue',
+      label: 'Tulu kokku',
       value: `€${((overview?.totalRevenue ?? 0) / 1000).toFixed(1)}k`,
       icon: CurrencyEuroIcon,
       color: 'text-green-600',
@@ -116,7 +124,7 @@ export default function Dashboard() {
       link: '/app/invoices',
     },
     {
-      label: 'Crew Members',
+      label: 'Meeskonnaliikmed',
       value: overview?.crewMembers ?? 0,
       icon: UsersIcon,
       color: 'text-orange-600',
@@ -128,11 +136,10 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">Welcome back! Here's what's happening today.</p>
+        <h1 className="text-2xl font-bold text-gray-900">Töölaud</h1>
+        <p className="text-gray-500 text-sm mt-1">Tere tulemast tagasi! Siin on tänane ülevaade.</p>
       </div>
 
-      {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {metrics.map(({ label, value, icon: Icon, color, bg, link }) => (
           <Link
@@ -152,11 +159,10 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Equipment Utilization */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-gray-900">Equipment Utilization Rate</h2>
-          <Link to="/app/analytics" className="text-sm text-primary hover:underline">View analytics →</Link>
+          <h2 className="text-base font-semibold text-gray-900">Seadmete kasutusaste</h2>
+          <Link to="/app/analytics" className="text-sm text-primary hover:underline">Vaata analüütikat →</Link>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
@@ -169,30 +175,29 @@ export default function Dashboard() {
             {overview?.equipmentUtilization ?? 0}%
           </span>
         </div>
-        <p className="text-xs text-gray-400 mt-2">Percentage of equipment currently assigned to active projects</p>
+        <p className="text-xs text-gray-400 mt-2">Seadmete osakaal, mis on praegu aktiivsete projektide jaoks määratud</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Projects */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h2 className="text-base font-semibold text-gray-900">Recent Projects</h2>
-            <Link to="/app/projects" className="text-sm text-primary hover:underline">View all →</Link>
+            <h2 className="text-base font-semibold text-gray-900">Viimased projektid</h2>
+            <Link to="/app/projects" className="text-sm text-primary hover:underline">Vaata kõiki →</Link>
           </div>
           {recentProjects.length === 0 ? (
             <div className="p-6 text-center text-gray-400">
               <FolderIcon className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No projects yet</p>
+              <p className="text-sm">Projekte pole veel</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-xs uppercase">
-                    <th className="text-left px-6 py-3">Project</th>
-                    <th className="text-left px-6 py-3 hidden sm:table-cell">Client</th>
-                    <th className="text-left px-6 py-3">Status</th>
-                    <th className="text-right px-6 py-3 hidden md:table-cell">Budget</th>
+                    <th className="text-left px-6 py-3">Projekt</th>
+                    <th className="text-left px-6 py-3 hidden sm:table-cell">Klient</th>
+                    <th className="text-left px-6 py-3">Staatus</th>
+                    <th className="text-right px-6 py-3 hidden md:table-cell">Eelarve</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -219,16 +224,15 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Upcoming Projects */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h2 className="text-base font-semibold text-gray-900">Upcoming Projects</h2>
-            <Link to="/app/calendar" className="text-sm text-primary hover:underline">View calendar →</Link>
+            <h2 className="text-base font-semibold text-gray-900">Tulevased projektid</h2>
+            <Link to="/app/calendar" className="text-sm text-primary hover:underline">Vaata kalendrit →</Link>
           </div>
           {upcomingProjects.length === 0 ? (
             <div className="p-6 text-center text-gray-400">
               <ClockIcon className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No upcoming projects</p>
+              <p className="text-sm">Tulevasi projekte pole</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -239,7 +243,7 @@ export default function Dashboard() {
                       <Link to={`/app/projects/${p.id}`} className="font-medium text-gray-900 hover:text-primary">
                         {p.name}
                       </Link>
-                      <p className="text-xs text-gray-400 mt-0.5">{p.client_name || 'No client'}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{p.client_name || 'Klient puudub'}</p>
                     </div>
                     <StatusBadge status={p.status} />
                   </div>

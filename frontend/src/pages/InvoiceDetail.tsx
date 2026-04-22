@@ -19,6 +19,13 @@ const COMPANY = {
   phone: '+3725068422',
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Mustand',
+  sent: 'Saadetud',
+  paid: 'Makstud',
+  overdue: 'Tähtaeg ületatud',
+}
+
 export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -82,7 +89,7 @@ export default function InvoiceDetail() {
       })
       setItems(inv.items?.map((i: any) => ({ id: i.id, description: i.description, quantity: Number(i.quantity), unit_price: Number(i.unit_price), line_total: Number(i.line_total) })) || [])
     } catch {
-      toast.error('Failed to load invoice')
+      toast.error('Arve laadimine ebaõnnestus')
     }
   }
 
@@ -111,8 +118,8 @@ export default function InvoiceDetail() {
   const total = subtotal + vatAmount
 
   async function save() {
-    if (!form.client_id) { toast.error('Please select a client'); return }
-    if (!form.invoice_number.trim()) { toast.error('Invoice number is required'); return }
+    if (!form.client_id) { toast.error('Palun vali klient'); return }
+    if (!form.invoice_number.trim()) { toast.error('Arve number on kohustuslik'); return }
     setSaving(true)
     try {
       const payload = {
@@ -127,15 +134,15 @@ export default function InvoiceDetail() {
       }
       if (isNew) {
         const res = await api.post('/invoices', payload)
-        toast.success('Invoice created')
+        toast.success('Arve loodud')
         navigate(`/app/invoices/${res.data.id}`, { replace: true })
       } else {
         await api.put(`/invoices/${id}`, payload)
-        toast.success('Invoice saved')
+        toast.success('Arve salvestatud')
         loadInvoice()
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to save invoice')
+      toast.error(err.response?.data?.error || 'Arve salvestamine ebaõnnestus')
     } finally {
       setSaving(false)
     }
@@ -144,21 +151,21 @@ export default function InvoiceDetail() {
   function openSendModal() {
     const client = clients.find(c => c.id === parseInt(form.client_id))
     setSendEmail(client?.email || '')
-    setSendSubject(`Invoice ${form.invoice_number} from ${COMPANY.name}`)
+    setSendSubject(`Arve ${form.invoice_number} firmalt ${COMPANY.name}`)
     setSendMessage('')
     setShowSendModal(true)
   }
 
   async function sendToClient() {
-    if (!sendEmail) { toast.error('Recipient email is required'); return }
+    if (!sendEmail) { toast.error('Saaja e-post on kohustuslik'); return }
     setSending(true)
     try {
       await api.post(`/invoices/${id}/send`, { to: sendEmail, subject: sendSubject, message: sendMessage })
-      toast.success(`✅ Successfully sent to ${sendEmail}`)
+      toast.success(`✅ Edukalt saadetud aadressile ${sendEmail}`)
       setShowSendModal(false)
       if (!isNew) loadInvoice()
     } catch {
-      toast.error('Failed to send email')
+      toast.error('E-posti saatmine ebaõnnestus')
     } finally {
       setSending(false)
     }
@@ -171,22 +178,21 @@ export default function InvoiceDetail() {
       <div className="no-print space-y-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <button onClick={() => navigate('/app/invoices')} className="hover:text-primary">Invoices</button>
+            <button onClick={() => navigate('/app/invoices')} className="hover:text-primary">Arved</button>
             <span>/</span>
-            <span>{isNew ? 'New Invoice' : form.invoice_number}</span>
+            <span>{isNew ? 'Uus arve' : form.invoice_number}</span>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => window.print()} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Download PDF</button>
-            {!isNew && <button onClick={openSendModal} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-dark">Send to Client</button>}
+            <button onClick={() => window.print()} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Laadi PDF</button>
+            {!isNew && <button onClick={openSendModal} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-dark">Saada kliendile</button>}
             <button onClick={save} disabled={saving} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50">
-              {saving ? 'Saving...' : 'Save Invoice'}
+              {saving ? 'Salvestamine...' : 'Salvesta arve'}
             </button>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 max-w-4xl mx-auto print:shadow-none print:border-none print:rounded-none print:max-w-none print:p-6">
-        {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-2xl font-bold text-primary">{COMPANY.name}</h1>
@@ -194,10 +200,10 @@ export default function InvoiceDetail() {
             <p className="text-sm text-gray-500">{COMPANY.email} · {COMPANY.phone}</p>
           </div>
           <div className="text-right">
-            <div className="text-3xl font-bold text-gray-800">INVOICE</div>
+            <div className="text-3xl font-bold text-gray-800">ARVE</div>
             <div className="no-print mt-1">
               <span className={`px-2 py-1 rounded text-xs font-medium ${form.status === 'paid' ? 'bg-green-100 text-green-700' : form.status === 'overdue' ? 'bg-red-100 text-red-700' : form.status === 'sent' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                {form.status.toUpperCase()}
+                {STATUS_LABELS[form.status] || form.status}
               </span>
             </div>
           </div>
@@ -205,7 +211,7 @@ export default function InvoiceDetail() {
 
         <div className="grid grid-cols-2 gap-8 mb-8">
           <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">Bill To</h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">Arve saaja</h3>
             {selectedClient ? (
               <div className="text-sm">
                 <div className="font-semibold text-gray-900">{selectedClient.name}</div>
@@ -216,7 +222,7 @@ export default function InvoiceDetail() {
             ) : (
               <div className="no-print">
                 <select value={form.client_id} onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option value="">Select client...</option>
+                  <option value="">Vali klient...</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>)}
                 </select>
               </div>
@@ -224,7 +230,7 @@ export default function InvoiceDetail() {
             {selectedClient && (
               <div className="no-print mt-2">
                 <select value={form.client_id} onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))} className="border border-gray-300 rounded text-xs px-2 py-1 text-gray-500">
-                  <option value="">Change client...</option>
+                  <option value="">Vaheta klient...</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
@@ -232,27 +238,27 @@ export default function InvoiceDetail() {
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-medium">Invoice No.</span>
+              <span className="text-gray-500 font-medium">Arve nr.</span>
               <input value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} className="no-print border border-gray-200 rounded px-2 py-1 text-sm text-right w-36 focus:outline-none" />
               <span className="print-only hidden font-semibold">{form.invoice_number}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-medium">Date</span>
+              <span className="text-gray-500 font-medium">Kuupäev</span>
               <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="no-print border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none" />
               <span className="print-only hidden">{form.date ? new Date(form.date).toLocaleDateString('et-EE') : ''}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-medium">Due Date</span>
+              <span className="text-gray-500 font-medium">Maksetähtaeg</span>
               <input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} className="no-print border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none" />
               <span className="print-only hidden">{form.due_date ? new Date(form.due_date).toLocaleDateString('et-EE') : '—'}</span>
             </div>
             <div className="no-print flex justify-between items-center">
-              <span className="text-gray-500 font-medium">Status</span>
+              <span className="text-gray-500 font-medium">Staatus</span>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none">
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
+                <option value="draft">Mustand</option>
+                <option value="sent">Saadetud</option>
+                <option value="paid">Makstud</option>
+                <option value="overdue">Tähtaeg ületatud</option>
               </select>
             </div>
           </div>
@@ -261,10 +267,10 @@ export default function InvoiceDetail() {
         <table className="w-full mb-6">
           <thead>
             <tr className="border-b-2 border-gray-200">
-              <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase">Description</th>
-              <th className="text-center py-2 text-xs font-semibold text-gray-500 uppercase w-20">Qty</th>
-              <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase w-28">Unit Price</th>
-              <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase w-28">Total</th>
+              <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase">Kirjeldus</th>
+              <th className="text-center py-2 text-xs font-semibold text-gray-500 uppercase w-20">Kogus</th>
+              <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase w-28">Ühiku hind</th>
+              <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase w-28">Kokku</th>
               <th className="w-8 no-print"></th>
             </tr>
           </thead>
@@ -272,7 +278,7 @@ export default function InvoiceDetail() {
             {items.map((item, idx) => (
               <tr key={idx} className="border-b border-gray-100">
                 <td className="py-2 pr-4">
-                  <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Item description..." className="no-print w-full border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none py-1 text-sm" />
+                  <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Rea kirjeldus..." className="no-print w-full border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none py-1 text-sm" />
                   <span className="print-only hidden text-sm">{item.description}</span>
                 </td>
                 <td className="py-2 text-center">
@@ -293,17 +299,17 @@ export default function InvoiceDetail() {
         </table>
 
         <div className="no-print mb-6">
-          <button onClick={addItem} className="text-sm text-primary hover:underline">+ Add Row</button>
+          <button onClick={addItem} className="text-sm text-primary hover:underline">+ Lisa rida</button>
         </div>
 
         <div className="flex justify-end mb-6">
           <div className="w-64 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Subtotal</span>
+              <span className="text-gray-500">Vahesumma</span>
               <span>€{subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500">VAT%</span>
+              <span className="text-gray-500">KM%</span>
               <div className="flex items-center gap-1">
                 <input type="number" min="0" max="100" value={form.vat_rate} onChange={e => setForm(f => ({ ...f, vat_rate: parseFloat(e.target.value) || 0 }))} className="no-print w-14 text-right border border-gray-200 rounded px-1 py-0.5 text-sm focus:outline-none" />
                 <span className="print-only hidden">{form.vat_rate}%</span>
@@ -311,14 +317,14 @@ export default function InvoiceDetail() {
               </div>
             </div>
             <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-2">
-              <span>Total</span>
+              <span>Kokku</span>
               <span>€{total.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         <div className="mb-6">
-          <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Additional notes..." className="no-print w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Lisamärkmed..." className="no-print w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
           {form.notes && <p className="print-only hidden text-sm text-gray-600">{form.notes}</p>}
         </div>
 
@@ -331,27 +337,27 @@ export default function InvoiceDetail() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 no-print">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-semibold text-gray-900">Send Invoice to Client</h3>
+              <h3 className="font-semibold text-gray-900">Saada arve kliendile</h3>
               <button onClick={() => setShowSendModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Recipient Email</label>
+                <label className="text-sm font-medium text-gray-700">Saaja e-post</label>
                 <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Subject</label>
+                <label className="text-sm font-medium text-gray-700">Teema</label>
                 <input value={sendSubject} onChange={e => setSendSubject(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Message (optional)</label>
+                <label className="text-sm font-medium text-gray-700">Sõnum (valikuline)</label>
                 <textarea value={sendMessage} onChange={e => setSendMessage(e.target.value)} rows={3} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
             <div className="flex justify-end gap-3 p-4 border-t">
-              <button onClick={() => setShowSendModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => setShowSendModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Tühista</button>
               <button onClick={sendToClient} disabled={sending} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-dark disabled:opacity-50">
-                {sending ? 'Sending...' : 'Send'}
+                {sending ? 'Saatmine...' : 'Saada'}
               </button>
             </div>
           </div>

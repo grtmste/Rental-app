@@ -20,6 +20,30 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'bg-green-100 text-green-700',
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Mustand',
+  confirmed: 'Kinnitatud',
+  in_progress: 'Töös',
+  completed: 'Lõpetatud',
+  cancelled: 'Tühistatud',
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Nimi',
+  company: 'Ettevõte',
+  email: 'E-post',
+  phone: 'Telefon',
+  address: 'Aadress',
+  notes: 'Märkmed',
+}
+
+const COMM_TYPE_LABELS: Record<string, string> = {
+  note: 'Märge',
+  call: 'Telefonikõne',
+  email: 'E-post',
+  meeting: 'Kohtumine',
+}
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -54,7 +78,7 @@ export default function ClientDetail() {
       })
       setComms(commRes.data)
     } catch {
-      toast.error('Failed to load client')
+      toast.error('Kliendi laadimine ebaõnnestus')
     } finally {
       setLoading(false)
     }
@@ -63,38 +87,38 @@ export default function ClientDetail() {
   async function saveClient() {
     try {
       await api.put(`/clients/${id}`, form)
-      toast.success('Client updated')
+      toast.success('Klient uuendatud')
       setEditing(false)
       fetchAll()
     } catch {
-      toast.error('Failed to save client')
+      toast.error('Kliendi salvestamine ebaõnnestus')
     }
   }
 
   async function addLog() {
-    if (!logForm.message.trim()) { toast.error('Message is required'); return }
+    if (!logForm.message.trim()) { toast.error('Sõnum on kohustuslik'); return }
     setSavingLog(true)
     try {
       await api.post(`/clients/${id}/communications`, logForm)
-      toast.success('Note added')
+      toast.success('Märge lisatud')
       setLogForm({ type: 'note', subject: '', message: '' })
       fetchAll()
     } catch {
-      toast.error('Failed to add note')
+      toast.error('Märke lisamine ebaõnnestus')
     } finally {
       setSavingLog(false)
     }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div></div>
-  if (!client) return <div className="p-8 text-gray-500">Client not found</div>
+  if (!client) return <div className="p-8 text-gray-500">Klienti ei leitud</div>
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <Link to="/app/crm" className="hover:text-primary">CRM</Link>
+            <Link to="/app/crm" className="hover:text-primary">Kliendid</Link>
             <span>/</span>
             <span>{client.name}</span>
           </div>
@@ -102,19 +126,18 @@ export default function ClientDetail() {
           {client.company && <p className="text-gray-500">{client.company}</p>}
         </div>
         <button onClick={() => setEditing(!editing)} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
-          {editing ? 'Cancel Edit' : 'Edit Client'}
+          {editing ? 'Tühista muutmine' : 'Muuda klienti'}
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Contact Info */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Contact Info</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">Kontaktandmed</h3>
           {editing ? (
             <div className="space-y-3">
               {['name','company','email','phone','address','notes'].map(field => (
                 <div key={field}>
-                  <label className="text-xs text-gray-500 capitalize">{field}</label>
+                  <label className="text-xs text-gray-500">{FIELD_LABELS[field] || field}</label>
                   {field === 'notes' || field === 'address' ? (
                     <textarea value={(form as any)[field]} onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))} className="mt-0.5 w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" rows={2} />
                   ) : (
@@ -122,23 +145,22 @@ export default function ClientDetail() {
                   )}
                 </div>
               ))}
-              <button onClick={saveClient} className="w-full py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark">Save Changes</button>
+              <button onClick={saveClient} className="w-full py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark">Salvesta muudatused</button>
             </div>
           ) : (
             <div className="space-y-3 text-sm">
-              {client.email && <div><span className="text-gray-400">Email</span><p className="text-gray-900">{client.email}</p></div>}
-              {client.phone && <div><span className="text-gray-400">Phone</span><p className="text-gray-900">{client.phone}</p></div>}
-              {client.address && <div><span className="text-gray-400">Address</span><p className="text-gray-900">{client.address}</p></div>}
-              {client.notes && <div><span className="text-gray-400">Notes</span><p className="text-gray-700 text-xs mt-1">{client.notes}</p></div>}
+              {client.email && <div><span className="text-gray-400">E-post</span><p className="text-gray-900">{client.email}</p></div>}
+              {client.phone && <div><span className="text-gray-400">Telefon</span><p className="text-gray-900">{client.phone}</p></div>}
+              {client.address && <div><span className="text-gray-400">Aadress</span><p className="text-gray-900">{client.address}</p></div>}
+              {client.notes && <div><span className="text-gray-400">Märkmed</span><p className="text-gray-700 text-xs mt-1">{client.notes}</p></div>}
             </div>
           )}
         </div>
 
-        {/* Project History */}
         <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Project History ({projects.length})</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">Projektide ajalugu ({projects.length})</h3>
           {projects.length === 0 ? (
-            <p className="text-gray-400 text-sm">No projects yet</p>
+            <p className="text-gray-400 text-sm">Projekte pole veel</p>
           ) : (
             <div className="space-y-2">
               {projects.map(p => (
@@ -151,7 +173,9 @@ export default function ClientDetail() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-sm">€{Number(p.budget || 0).toLocaleString('et-EE', { minimumFractionDigits: 2 })}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status]}`}>{p.status.replace('_', ' ')}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status] || 'bg-gray-100 text-gray-700'}`}>
+                      {STATUS_LABELS[p.status] || p.status}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -160,17 +184,16 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* Communication Log */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Communication Log</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Suhtlusajalugu</h3>
         <div className="space-y-4 mb-6">
           {comms.length === 0 ? (
-            <p className="text-gray-400 text-sm">No communications logged yet</p>
+            <p className="text-gray-400 text-sm">Suhtlust pole veel logitud</p>
           ) : (
             comms.map(log => (
               <div key={log.id} className="border-l-4 border-primary pl-4 py-1">
                 <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <span className="capitalize font-medium text-gray-600">{log.type}</span>
+                  <span className="font-medium text-gray-600">{COMM_TYPE_LABELS[log.type] || log.type}</span>
                   {log.subject && <span>· {log.subject}</span>}
                   <span>· {new Date(log.created_at).toLocaleDateString('et-EE')} {new Date(log.created_at).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
@@ -180,30 +203,29 @@ export default function ClientDetail() {
           )}
         </div>
 
-        {/* Add log form */}
         <div className="border-t border-gray-100 pt-4 space-y-3">
-          <h4 className="text-sm font-medium text-gray-700">Add Note</h4>
+          <h4 className="text-sm font-medium text-gray-700">Lisa märge</h4>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500">Type</label>
+              <label className="text-xs text-gray-500">Tüüp</label>
               <select value={logForm.type} onChange={e => setLogForm(p => ({ ...p, type: e.target.value }))} className="mt-0.5 w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-                <option value="note">Note</option>
-                <option value="call">Phone Call</option>
-                <option value="email">Email</option>
-                <option value="meeting">Meeting</option>
+                <option value="note">Märge</option>
+                <option value="call">Telefonikõne</option>
+                <option value="email">E-post</option>
+                <option value="meeting">Kohtumine</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Subject</label>
+              <label className="text-xs text-gray-500">Teema</label>
               <input value={logForm.subject} onChange={e => setLogForm(p => ({ ...p, subject: e.target.value }))} className="mt-0.5 w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-500">Message *</label>
+            <label className="text-xs text-gray-500">Sõnum *</label>
             <textarea value={logForm.message} onChange={e => setLogForm(p => ({ ...p, message: e.target.value }))} rows={2} className="mt-0.5 w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <button onClick={addLog} disabled={savingLog} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50">
-            {savingLog ? 'Adding...' : 'Add Note'}
+            {savingLog ? 'Lisamine...' : 'Lisa märge'}
           </button>
         </div>
       </div>

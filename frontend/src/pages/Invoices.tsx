@@ -21,6 +21,13 @@ const STATUS_COLORS: Record<string, string> = {
   overdue: 'bg-red-100 text-red-700',
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Mustand',
+  sent: 'Saadetud',
+  paid: 'Makstud',
+  overdue: 'Tähtaeg ületatud',
+}
+
 export default function Invoices() {
   const navigate = useNavigate()
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -35,20 +42,20 @@ export default function Invoices() {
       const res = await api.get('/invoices')
       setInvoices(res.data)
     } catch {
-      toast.error('Failed to load invoices')
+      toast.error('Arvete laadimine ebaõnnestus')
     } finally {
       setLoading(false)
     }
   }
 
   async function deleteInvoice(id: number) {
-    if (!confirm('Delete this invoice?')) return
+    if (!confirm('Kustuta see arve?')) return
     try {
       await api.delete(`/invoices/${id}`)
-      toast.success('Invoice deleted')
+      toast.success('Arve kustutatud')
       fetchInvoices()
     } catch {
-      toast.error('Failed to delete invoice')
+      toast.error('Kustutamine ebaõnnestus')
     }
   }
 
@@ -60,44 +67,44 @@ export default function Invoices() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-gray-500 text-sm mt-1">{invoices.length} total invoices</p>
+          <h1 className="text-2xl font-bold text-gray-900">Arved</h1>
+          <p className="text-gray-500 text-sm mt-1">{invoices.length} arvet kokku</p>
         </div>
         <button onClick={() => navigate('/app/invoices/new')} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors">
-          + Create Invoice
+          + Loo arve
         </button>
       </div>
 
       <div className="flex items-center gap-4">
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-          <option value="">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="sent">Sent</option>
-          <option value="paid">Paid</option>
-          <option value="overdue">Overdue</option>
+          <option value="">Kõik staatused</option>
+          <option value="draft">Mustand</option>
+          <option value="sent">Saadetud</option>
+          <option value="paid">Makstud</option>
+          <option value="overdue">Tähtaeg ületatud</option>
         </select>
       </div>
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <div className="text-5xl mb-4">🧾</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices yet</h3>
-          <p className="text-gray-500 mb-4">Create your first invoice</p>
-          <button onClick={() => navigate('/app/invoices/new')} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Create Invoice</button>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Arveid pole veel</h3>
+          <p className="text-gray-500 mb-4">Loo esimene arve</p>
+          <button onClick={() => navigate('/app/invoices/new')} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Loo arve</button>
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
-                <th className="px-4 py-3 text-left">Invoice #</th>
-                <th className="px-4 py-3 text-left">Client</th>
-                <th className="px-4 py-3 text-left">Project</th>
-                <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-left">Due Date</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-left">Arve #</th>
+                <th className="px-4 py-3 text-left">Klient</th>
+                <th className="px-4 py-3 text-left">Projekt</th>
+                <th className="px-4 py-3 text-left">Kuupäev</th>
+                <th className="px-4 py-3 text-left">Tähtaeg</th>
+                <th className="px-4 py-3 text-right">Summa</th>
+                <th className="px-4 py-3 text-center">Staatus</th>
+                <th className="px-4 py-3 text-right">Toimingud</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -110,13 +117,13 @@ export default function Invoices() {
                   <td className="px-4 py-3 text-gray-500">{inv.due_date ? new Date(inv.due_date).toLocaleDateString('et-EE') : '—'}</td>
                   <td className="px-4 py-3 text-right font-medium">€{Number(inv.total || 0).toLocaleString('et-EE', { minimumFractionDigits: 2 })}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status]}`}>
-                      {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status] || 'bg-gray-100 text-gray-700'}`}>
+                      {STATUS_LABELS[inv.status] || inv.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => navigate(`/app/invoices/${inv.id}`)} className="text-primary hover:underline text-xs mr-3">Edit</button>
-                    <button onClick={() => deleteInvoice(inv.id)} className="text-red-500 hover:underline text-xs">Delete</button>
+                    <button onClick={() => navigate(`/app/invoices/${inv.id}`)} className="text-primary hover:underline text-xs mr-3">Muuda</button>
+                    <button onClick={() => deleteInvoice(inv.id)} className="text-red-500 hover:underline text-xs">Kustuta</button>
                   </td>
                 </tr>
               ))}
