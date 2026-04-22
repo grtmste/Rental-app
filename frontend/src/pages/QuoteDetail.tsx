@@ -472,56 +472,60 @@ export default function QuoteDetail() {
             <button onClick={addItem} className="mt-3 text-sm text-primary hover:underline">+ Lisa rida</button>
           </div>
 
-          {/* ── PRINT mode: Stage → Category → Items, no individual prices ── */}
+          {/* ── Grouped view: Stage → Category → Items (screen + print) ── */}
           {(() => {
             const hasStages = items.some(i => i.stage_name?.trim())
-            const stageGroups = items.reduce((acc, item) => {
-              const stage = (hasStages ? item.stage_name?.trim() : '') || (hasStages ? 'Muu' : '__noStage__')
+            const stageGroups: Record<string, { cats: Record<string, { items: QuoteItem[], total: number }>, total: number }> = {}
+            items.forEach(item => {
+              const stage = item.stage_name?.trim() || (hasStages ? 'Muu' : '__all__')
               const cat = item.category_name?.trim() || 'Muu'
-              if (!acc[stage]) acc[stage] = { cats: {} as Record<string, { items: QuoteItem[], total: number }>, total: 0 }
-              if (!acc[stage].cats[cat]) acc[stage].cats[cat] = { items: [], total: 0 }
-              acc[stage].cats[cat].items.push(item)
-              acc[stage].cats[cat].total += Number(item.line_total)
-              acc[stage].total += Number(item.line_total)
-              return acc
-            }, {} as Record<string, { cats: Record<string, { items: QuoteItem[], total: number }>, total: number }>)
-
+              if (!stageGroups[stage]) stageGroups[stage] = { cats: {}, total: 0 }
+              if (!stageGroups[stage].cats[cat]) stageGroups[stage].cats[cat] = { items: [], total: 0 }
+              stageGroups[stage].cats[cat].items.push(item)
+              stageGroups[stage].cats[cat].total += Number(item.line_total)
+              stageGroups[stage].total += Number(item.line_total)
+            })
+            const sortedStages = Object.keys(stageGroups).sort((a, b) => a === '__all__' ? 0 : a.localeCompare(b))
             return (
-              <div className="print-only hidden mb-6">
-                {Object.entries(stageGroups).map(([stageName, stageData]) => (
-                  <div key={stageName} className="mb-6">
-                    {hasStages && (
-                      <div className="font-bold text-gray-900 text-lg border-b-2 border-gray-400 pb-1 mb-3">{stageName}</div>
-                    )}
-                    {Object.entries(stageData.cats).map(([catName, catData]) => (
-                      <div key={catName} className="mb-4 ml-0">
-                        <div className="font-semibold text-gray-700 text-sm border-b border-gray-200 pb-1 mb-1">{catName}</div>
-                        <table className="w-full text-sm">
-                          <tbody>
-                            {catData.items.map((item, idx) => (
-                              <tr key={idx} className="border-b border-gray-50">
-                                <td className="py-1.5 pl-2">{item.description}</td>
-                                <td className="py-1.5 text-right text-gray-600 w-20">× {item.quantity}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        <div className="flex justify-end mt-1">
-                          <span className="text-sm font-semibold text-gray-600">
-                            {catName} kokku: €{catData.total.toFixed(2)}
-                          </span>
+              <div className="mb-6 mt-2">
+                {sortedStages.map(stageName => {
+                  const stageData = stageGroups[stageName]
+                  const sortedCats = Object.keys(stageData.cats).sort((a, b) => a.localeCompare(b))
+                  return (
+                    <div key={stageName} className="mb-6">
+                      {hasStages && stageName !== '__all__' && (
+                        <div className="font-bold text-gray-900 text-base border-b-2 border-gray-800 pb-1 mb-3 uppercase tracking-wide">{stageName}</div>
+                      )}
+                      {sortedCats.map(catName => {
+                        const catData = stageData.cats[catName]
+                        const sortedItems = [...catData.items].sort((a, b) => a.description.localeCompare(b.description))
+                        return (
+                          <div key={catName} className="mb-4">
+                            <div className="font-semibold text-gray-700 text-sm border-b border-gray-300 pb-1 mb-1">{catName}</div>
+                            <table className="w-full text-sm">
+                              <tbody>
+                                {sortedItems.map((item, idx) => (
+                                  <tr key={idx} className="border-b border-gray-50">
+                                    <td className="py-1.5 pl-2">{item.description}</td>
+                                    <td className="py-1.5 text-right text-gray-500 w-16">× {item.quantity}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <div className="flex justify-end mt-1">
+                              <span className="text-sm font-medium text-gray-600">{catName} kokku: €{catData.total.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {hasStages && stageName !== '__all__' && (
+                        <div className="flex justify-end mt-1 pt-1 border-t border-gray-400">
+                          <span className="text-sm font-bold text-gray-800">{stageName} kokku: €{stageData.total.toFixed(2)}</span>
                         </div>
-                      </div>
-                    ))}
-                    {hasStages && (
-                      <div className="flex justify-end mt-2 mb-1">
-                        <span className="text-base font-bold text-gray-800 border-t border-gray-300 pt-1">
-                          {stageName} kokku: €{stageData.total.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )
           })()}

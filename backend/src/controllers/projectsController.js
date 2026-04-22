@@ -315,32 +315,6 @@ const updateEquipment = async (req, res, next) => {
       return res.status(404).json({ error: 'Project equipment record not found.' });
     }
 
-    if (quantity !== undefined) {
-      const equipment_id = existing.rows[0].equipment_id;
-      const availabilityResult = await pool.query(`
-        SELECT
-          e.total_quantity,
-          COALESCE(SUM(pe.quantity) FILTER (
-            WHERE p.status IN ('confirmed', 'in_progress') AND pe.project_id IS NOT NULL AND pe.id != $2
-          ), 0) AS reserved_quantity
-        FROM equipment e
-        LEFT JOIN project_equipment pe ON e.id = pe.equipment_id
-        LEFT JOIN projects p ON pe.project_id = p.id
-        WHERE e.id = $1
-        GROUP BY e.id
-      `, [equipment_id, parseInt(itemId)]);
-
-      const { total_quantity, reserved_quantity } = availabilityResult.rows[0];
-      const available = parseInt(total_quantity) - parseInt(reserved_quantity);
-
-      if (parseInt(quantity) > available) {
-        return res.status(400).json({
-          error: `Not enough stock. Available quantity: ${available}, requested: ${quantity}.`,
-          available,
-        });
-      }
-    }
-
     const result = await pool.query(
       `UPDATE project_equipment
        SET quantity = COALESCE($1, quantity),

@@ -131,10 +131,6 @@ export default function ProjectDetail() {
   const [categories, setCategories] = useState<string[]>([])
   const [selectedStageId, setSelectedStageId] = useState<number | ''>('')
 
-  // Inline equipment editing
-  const [editingEqId, setEditingEqId] = useState<number | null>(null)
-  const [editingEqQty, setEditingEqQty] = useState(1)
-
   // Stage management
   const [newStageName, setNewStageName] = useState('')
   const [addingStage, setAddingStage] = useState(false)
@@ -604,13 +600,8 @@ export default function ProjectDetail() {
                 categoryGroups={stageGroups[stageName]}
                 stages={stages}
                 onRemove={removeEquipment}
-                onEditQty={(item) => { setEditingEqId(item.id); setEditingEqQty(item.quantity) }}
+                onQtyChange={updateEquipmentQty}
                 onChangeStage={updateEquipmentStage}
-                editingEqId={editingEqId}
-                editingEqQty={editingEqQty}
-                setEditingEqQty={setEditingEqQty}
-                onSaveQty={updateEquipmentQty}
-                onCancelEdit={() => setEditingEqId(null)}
               />
             ))}
           </div>
@@ -899,16 +890,11 @@ interface StageSectionProps {
   categoryGroups: Record<string, ProjectEquipment[]>
   stages: Stage[]
   onRemove: (id: number) => void
-  onEditQty: (item: ProjectEquipment) => void
+  onQtyChange: (itemId: number, qty: number) => void
   onChangeStage: (itemId: number, stageId: number | null) => void
-  editingEqId: number | null
-  editingEqQty: number
-  setEditingEqQty: (v: number) => void
-  onSaveQty: (id: number, qty: number) => void
-  onCancelEdit: () => void
 }
 
-function StageSection({ stageName, categoryGroups, stages, onRemove, onEditQty, onChangeStage, editingEqId, editingEqQty, setEditingEqQty, onSaveQty, onCancelEdit }: StageSectionProps) {
+function StageSection({ stageName, categoryGroups, stages, onRemove, onQtyChange, onChangeStage }: StageSectionProps) {
   const [open, setOpen] = useState(true)
   const catKeys = Object.keys(categoryGroups).sort()
 
@@ -953,15 +939,18 @@ function StageSection({ stageName, categoryGroups, stages, onRemove, onEditQty, 
                     <tr key={item.id} className={`hover:bg-gray-50 ${item.is_overbooked ? 'bg-red-50 hover:bg-red-100' : ''}`}>
                       <td className="px-6 py-3 font-medium truncate">{item.equipment_name}</td>
                       <td className="px-4 py-3 text-center">
-                        {editingEqId === item.id ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <input type="number" min="1" value={editingEqQty} onChange={e => setEditingEqQty(Number(e.target.value))} className="w-14 border border-gray-300 rounded px-1 py-1 text-sm text-center" />
-                            <button onClick={() => onSaveQty(item.id, editingEqQty)} className="text-xs text-green-600 hover:underline">✓</button>
-                            <button onClick={onCancelEdit} className="text-xs text-gray-400 hover:underline">✕</button>
-                          </div>
-                        ) : (
-                          <span className="cursor-pointer hover:text-primary" onClick={() => onEditQty(item)}>{item.quantity}</span>
-                        )}
+                        <input
+                          type="number"
+                          min="1"
+                          key={item.id}
+                          defaultValue={item.quantity}
+                          onBlur={e => {
+                            const v = parseInt(e.target.value)
+                            if (v > 0 && v !== item.quantity) onQtyChange(item.id, v)
+                          }}
+                          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                          className="w-16 border border-gray-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
                       </td>
                       <td className="px-4 py-3 text-right text-gray-600">€{Number(item.daily_rate || 0).toFixed(2)}/päev</td>
                       <td className="px-4 py-3 text-center">

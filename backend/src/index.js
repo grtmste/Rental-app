@@ -37,6 +37,10 @@ async function runMigrations() {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_project_stages_project ON project_stages(project_id)`);
     await pool.query(`ALTER TABLE project_equipment ADD COLUMN IF NOT EXISTS stage_id INTEGER REFERENCES project_stages(id) ON DELETE SET NULL`);
+    // Replace (project_id, equipment_id) unique constraint with per-stage uniqueness
+    await pool.query(`ALTER TABLE project_equipment DROP CONSTRAINT IF EXISTS project_equipment_project_id_equipment_id_key`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pe_unique_staged ON project_equipment (project_id, equipment_id, stage_id) WHERE stage_id IS NOT NULL`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pe_unique_unstaged ON project_equipment (project_id, equipment_id) WHERE stage_id IS NULL`);
     console.log('✅ Migrations applied');
   } catch (err) {
     console.error('⚠️  Migration error:', err.message);
