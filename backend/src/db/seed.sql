@@ -5,11 +5,12 @@
 -- ============================================================
 -- 1. USERS
 -- ============================================================
+-- Password for all accounts: admin123
 INSERT INTO users (name, email, password_hash, role) VALUES
-  ('Admin User',      'admin@stereosound.ee',   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin'),
-  ('Karmo Gudinas',   'karmo@stereosound.ee',   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager'),
-  ('Jaanus Tamm',     'jaanus@stereosound.ee',  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'crew')
-ON CONFLICT (email) DO NOTHING;
+  ('Admin User',    'admin@stereosound.ee',  '$2a$10$r3mru6pl7wX105iDxmYnF.rIov4toDpj5ISUAkPY1EvvEW.ZMUO/q', 'admin'),
+  ('Karmo Gudinas', 'karmo@stereosound.ee',  '$2a$10$r3mru6pl7wX105iDxmYnF.rIov4toDpj5ISUAkPY1EvvEW.ZMUO/q', 'manager'),
+  ('Jaanus Tamm',   'jaanus@stereosound.ee', '$2a$10$r3mru6pl7wX105iDxmYnF.rIov4toDpj5ISUAkPY1EvvEW.ZMUO/q', 'crew')
+ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 -- ============================================================
 -- 2. CATEGORIES

@@ -1,51 +1,65 @@
 #!/bin/bash
 set -e
 
-echo "=== Rental App Setup ==="
-
-# 1. Start PostgreSQL
-echo ""
-echo "▶ Starting PostgreSQL..."
-if command -v pg_ctlcluster &> /dev/null; then
-  sudo pg_ctlcluster 16 main start 2>/dev/null || echo "  (already running)"
-elif command -v /usr/bin/pg_ctlcluster &> /dev/null; then
-  sudo /usr/bin/pg_ctlcluster 16 main start 2>/dev/null || echo "  (already running)"
-else
-  sudo service postgresql start 2>/dev/null || pg_ctl start 2>/dev/null || echo "  Could not start PostgreSQL automatically"
-fi
-
-sleep 2
-
-# 2. Set postgres password
-echo ""
-echo "▶ Configuring PostgreSQL user..."
-sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" 2>/dev/null || true
-
-# 3. Create database
-echo ""
-echo "▶ Creating database..."
-sudo -u postgres psql -c "CREATE DATABASE rental_app;" 2>/dev/null || echo "  (already exists)"
-
-# 4. Run schema
-echo ""
-echo "▶ Running schema..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sudo -u postgres psql -d rental_app -f "$SCRIPT_DIR/backend/src/db/schema.sql"
+CURRENT_USER=$(whoami)
+PG_VERSION=$(ls /usr/lib/postgresql/ 2>/dev/null | sort -V | tail -1)
+PG_BIN="/usr/lib/postgresql/${PG_VERSION}/bin"
+PG_DATA="$HOME/.rental_pgdata"
+PG_PORT=5432
+PG_LOG="$HOME/.rental_pg.log"
 
-# 5. Run seed
-echo ""
-echo "▶ Seeding data..."
-sudo -u postgres psql -d rental_app -f "$SCRIPT_DIR/backend/src/db/seed.sql"
+echo "=== Rental App Setup ==="
+echo "User: $CURRENT_USER | PostgreSQL: $PG_VERSION"
 
-# 6. Ensure .env exists
-echo ""
-echo "▶ Setting up .env..."
-if [ ! -f "$SCRIPT_DIR/backend/.env" ]; then
-  cp "$SCRIPT_DIR/backend/.env.example" "$SCRIPT_DIR/backend/.env"
+# ── 1. Start or initialize PostgreSQL ──────────────────────────────────────────
+if pg_isready -p $PG_PORT -q 2>/dev/null; then
+  echo "✅ PostgreSQL already running on port $PG_PORT"
+else
+  if [ ! -d "$PG_DATA" ]; then
+    echo "▶ Initializing PostgreSQL cluster..."
+    "$PG_BIN/initdb" -D "$PG_DATA" \
+      --auth=trust \
+      --username="$CURRENT_USER" \
+      -E UTF8 \
+      --locale=C.UTF-8 \
+      -q
+  fi
+
+  echo "▶ Starting PostgreSQL..."
+  "$PG_BIN/pg_ctl" -D "$PG_DATA" -l "$PG_LOG" -o "-p $PG_PORT" start -w
+  sleep 1
 fi
-# Set working DATABASE_URL
-sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rental_app|' "$SCRIPT_DIR/backend/.env"
-sed -i 's|^JWT_SECRET=.*|JWT_SECRET=rentpro-super-secret-jwt-key-2025|' "$SCRIPT_DIR/backend/.env"
+
+# ── 2. Create database ──────────────────────────────────────────────────────────
+echo "▶ Creating database..."
+"$PG_BIN/createdb" -U "$CURRENT_USER" -p $PG_PORT rental_app 2>/dev/null \
+  && echo "  Created rental_app" \
+  || echo "  (already exists)"
+
+# ── 3. Write .env ───────────────────────────────────────────────────────────────
+echo "▶ Writing backend/.env..."
+cat > "$SCRIPT_DIR/backend/.env" <<EOF
+DATABASE_URL=postgresql://${CURRENT_USER}@localhost:${PG_PORT}/rental_app
+JWT_SECRET=rentpro-super-secret-jwt-key-2025
+PORT=3001
+FRONTEND_URL=http://localhost:5173
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+FROM_EMAIL=karmogudinas@gmail.com
+EOF
+
+# ── 4. Run schema ───────────────────────────────────────────────────────────────
+echo "▶ Running schema..."
+psql -U "$CURRENT_USER" -p $PG_PORT -d rental_app \
+  -f "$SCRIPT_DIR/backend/src/db/schema.sql" -q
+
+# ── 5. Run seed ─────────────────────────────────────────────────────────────────
+echo "▶ Seeding data..."
+psql -U "$CURRENT_USER" -p $PG_PORT -d rental_app \
+  -f "$SCRIPT_DIR/backend/src/db/seed.sql" -q
 
 echo ""
 echo "✅ Setup complete!"
@@ -54,6 +68,5 @@ echo "   Admin login:"
 echo "   Email:    admin@stereosound.ee"
 echo "   Password: admin123"
 echo ""
-echo "   Now run:"
-echo "   Terminal 1: cd backend && npm run dev"
-echo "   Terminal 2: cd frontend && npm run dev"
+echo "   Terminal 1:  cd /workspaces/Rental-app/backend && npm run dev"
+echo "   Terminal 2:  cd /workspaces/Rental-app/frontend && npm run dev"
