@@ -415,3 +415,50 @@ export default function ProjectDetail() {
     </div>
   )
   if (!project) return <div className="p-8 text-gray-500">Projekti ei leitud</div>
+
+  // ─── Part B: Stage Manager render helper ─────────────────────────────────────
+
+  function renderStageManager() {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h4 className="font-semibold text-gray-900 mb-3">Lavade haldus</h4>
+
+        {stages.length === 0 ? (
+          <p className="text-sm text-gray-400 mb-3">Lavad puuduvad. Lisa esimene lava.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {stages.map(s => (
+              <div key={s.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-sm">
+                <span className="text-blue-800 font-medium">{s.name}</span>
+                <button
+                  onClick={() => removeStage(s.id)}
+                  className="text-blue-400 hover:text-red-500 transition-colors ml-1 text-xs font-bold leading-none"
+                  title="Eemalda lava"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Uue lava nimi"
+            value={newStageName}
+            onChange={e => setNewStageName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addStage()}
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <button
+            onClick={addStage}
+            disabled={addingStage || !newStageName.trim()}
+            className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50 transition-colors"
+          >
+            {addingStage ? 'Lisamine...' : 'Lisa lava'}
+          </button>
+        </div>
+      </div>
+    )
+  }
