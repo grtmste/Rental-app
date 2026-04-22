@@ -133,18 +133,21 @@ export default function QuoteDetail() {
     if (!form.project_id) { toast.error('Pakkumisel pole seotud projekti'); return }
     setLoadingPickingList(true)
     try {
-      const [projRes, eqRes] = await Promise.all([
-        api.get(`/projects/${form.project_id}`),
-        api.get(`/projects/${form.project_id}/equipment`),
-      ])
+      const projRes = await api.get(`/projects/${form.project_id}`)
       setPickingListProject(projRes.data)
-      setPickingListEquipment(eqRes.data)
-      setPickingListMode(true)
     } catch {
       toast.error('Laonimekirja laadimine ebaõnnestus')
-    } finally {
       setLoadingPickingList(false)
+      return
     }
+    try {
+      const eqRes = await api.get(`/projects/${form.project_id}/equipment`)
+      setPickingListEquipment(Array.isArray(eqRes.data) ? eqRes.data : [])
+    } catch {
+      setPickingListEquipment([])
+    }
+    setPickingListMode(true)
+    setLoadingPickingList(false)
   }
 
   function updateItem(idx: number, field: keyof QuoteItem, value: string | number) {
