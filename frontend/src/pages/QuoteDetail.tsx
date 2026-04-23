@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
+// @ts-ignore
+import html2pdf from 'html2pdf.js'
 
 interface QuoteItem {
   id?: number
@@ -252,6 +254,54 @@ export default function QuoteDetail() {
     }
   }
 
+  function handlePdf() {
+    const element = printRef.current
+    if (!element) return
+    html2pdf().set({
+      margin: [1.5, 1.5, 1.5, 1.5],
+      filename: `pakkumine-${form.quote_number}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        onclone: (doc: Document) => {
+          doc.querySelectorAll('.no-print').forEach((el: Element) => {
+            (el as HTMLElement).style.display = 'none'
+          })
+          doc.querySelectorAll('.print-only').forEach((el: Element) => {
+            (el as HTMLElement).style.display = 'block'
+          })
+        },
+      },
+      jsPDF: { unit: 'cm', format: 'a4', orientation: 'portrait' },
+    }).from(element).save()
+  }
+
+  async function createInvoice() {
+    if (!form.client_id) { toast.error('Vali kõigepealt klient'); return }
+    try {
+      const res = await api.post('/invoices', {
+        client_id: parseInt(form.client_id),
+        project_id: form.project_id ? parseInt(form.project_id) : null,
+        quote_id: isNew ? null : parseInt(id!),
+        status: 'draft',
+        date: form.date,
+        due_date: form.due_date || null,
+        notes: form.notes || null,
+        vat_rate: form.vat_rate,
+        items: items.map(i => ({
+          description: i.description,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+        })),
+      })
+      toast.success('Arve loodud')
+      navigate(`/app/invoices/${res.data.id}`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Arve loomine ebaõnnestus')
+    }
+  }
+
   const selectedClient = clients.find(c => c.id === parseInt(form.client_id))
 
   return (
@@ -272,7 +322,7 @@ export default function QuoteDetail() {
               </>
             ) : (
               <>
-                <button onClick={() => window.print()} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Laadi PDF</button>
+                <button onClick={handlePdf} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Laadi PDF</button>
                 {form.project_id && (
                   <button
                     onClick={loadPickingList}
@@ -282,6 +332,7 @@ export default function QuoteDetail() {
                     {loadingPickingList ? 'Laen...' : 'Loo laonimekiri'}
                   </button>
                 )}
+                {!isNew && <button onClick={createInvoice} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">Loo arve</button>}
                 {!isNew && <button onClick={openSendModal} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-dark">Saada kliendile</button>}
                 <button onClick={save} disabled={saving} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50">
                   {saving ? 'Salvestamine...' : 'Salvesta pakkumine'}

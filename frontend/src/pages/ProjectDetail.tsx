@@ -125,11 +125,7 @@ export default function ProjectDetail() {
 
   // Equipment catalog / picker
   const [allEquipment, setAllEquipment] = useState<Equipment[]>([])
-  const [eqSearch, setEqSearch] = useState('')
-  const [eqCategoryFilter, setEqCategoryFilter] = useState('')
-  const [eqQty, setEqQty] = useState<Record<number, number>>({})
   const [categories, setCategories] = useState<string[]>([])
-  const [selectedStageId, setSelectedStageId] = useState<number | ''>('')
 
   // Stage management
   const [newStageName, setNewStageName] = useState('')
@@ -243,22 +239,12 @@ export default function ProjectDetail() {
 
   // ─── Equipment actions ────────────────────────────────────────────────────────
 
-  async function updateEquipmentStage(itemId: number, newStageId: number | null) {
-    try {
-      await api.put(`/projects/${id}/equipment/${itemId}`, { stage_id: newStageId })
-      fetchAll()
-    } catch {
-      toast.error('Lava muutmine ebaõnnestus')
-    }
-  }
-
-  async function addEquipment(eqId: number) {
-    const qty = eqQty[eqId] || 1
+  async function addEquipment(eqId: number, qty: number, stageId: number | null) {
     try {
       const res = await api.post(`/projects/${id}/equipment`, {
         equipment_id: eqId,
         quantity: qty,
-        stage_id: null,
+        stage_id: stageId,
       })
       if (res.data.overbooked) {
         toast('Seade lisatud — kogus ületab laovaru (üle broneeritud)', { icon: '⚠️' })
@@ -276,7 +262,6 @@ export default function ProjectDetail() {
     try {
       await api.put(`/projects/${id}/equipment/${itemId}`, { quantity: qty })
       toast.success('Kogus uuendatud')
-      setEditingEqId(null)
       fetchAll()
       fetchEquipmentOptions()
     } catch (err: any) {
@@ -397,23 +382,6 @@ export default function ProjectDetail() {
 
   // ─── Derived data ─────────────────────────────────────────────────────────────
 
-  const filteredEquipment = allEquipment.filter(e => {
-    const matchSearch = !eqSearch || e.name.toLowerCase().includes(eqSearch.toLowerCase()) || (e.category_name || '').toLowerCase().includes(eqSearch.toLowerCase())
-    const matchCat = !eqCategoryFilter || e.category_name === eqCategoryFilter
-    return matchSearch && matchCat
-  })
-
-  const assignedIds = new Set(equipment.map(e => e.equipment_id))
-
-  // Group assigned equipment: stage → category → items
-  const stageGroups: Record<string, Record<string, ProjectEquipment[]>> = {}
-  equipment.forEach(item => {
-    const stage = item.stage_name || 'Määramata lava'
-    const cat = item.category_name || 'Kategooriata'
-    if (!stageGroups[stage]) stageGroups[stage] = {}
-    if (!stageGroups[stage][cat]) stageGroups[stage][cat] = []
-    stageGroups[stage][cat].push(item)
-  })
 
   // ─── Guards ───────────────────────────────────────────────────────────────────
 
@@ -424,191 +392,6 @@ export default function ProjectDetail() {
   )
   if (!project) return <div className="p-8 text-gray-500">Projekti ei leitud</div>
 
-  // ─── Part B: Stage Manager render helper ─────────────────────────────────────
-
-  function renderStageManager() {
-    return (
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h4 className="font-semibold text-gray-900 mb-3">Lavade haldus</h4>
-
-        {stages.length === 0 ? (
-          <p className="text-sm text-gray-400 mb-3">Lavad puuduvad. Lisa esimene lava.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {stages.map(s => (
-              <div key={s.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-sm">
-                <span className="text-blue-800 font-medium">{s.name}</span>
-                <button
-                  onClick={() => removeStage(s.id)}
-                  className="text-blue-400 hover:text-red-500 transition-colors ml-1 text-xs font-bold leading-none"
-                  title="Eemalda lava"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Uue lava nimi"
-            value={newStageName}
-            onChange={e => setNewStageName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addStage()}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <button
-            onClick={addStage}
-            disabled={addingStage || !newStageName.trim()}
-            className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50 transition-colors"
-          >
-            {addingStage ? 'Lisamine...' : 'Lisa lava'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Part C: Equipment Assigner render helper ─────────────────────────────────
-
-  function renderEquipmentAssigner() {
-    return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-4 border-b border-gray-200 font-semibold text-gray-900">
-          Lisa seadmeid laost
-        </div>
-        <div className="p-4 space-y-3">
-          {/* Search + category filter */}
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="Otsi nime või kategooria järgi..."
-              value={eqSearch}
-              onChange={e => setEqSearch(e.target.value)}
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <select
-              value={eqCategoryFilter}
-              onChange={e => setEqCategoryFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Kõik kategooriad</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {/* Equipment list */}
-          <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
-            {filteredEquipment.map(eq => {
-              const isAssigned = assignedIds.has(eq.id)
-              const qty = eqQty[eq.id] || 1
-              const wouldOverbook = qty > eq.available_quantity
-              const outOfStock = eq.available_quantity <= 0 && !wouldOverbook
-              const lowStock = !wouldOverbook && !outOfStock && eq.available_quantity / eq.total_quantity <= 0.2
-
-              return (
-                <div key={eq.id} className={`px-4 py-3 ${wouldOverbook ? 'bg-yellow-50' : outOfStock ? 'bg-red-50' : lowStock ? 'bg-yellow-50' : ''}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{eq.name}</span>
-                        {eq.category_name && (
-                          <span className="text-xs text-gray-400">— {eq.category_name}</span>
-                        )}
-                        {wouldOverbook && (
-                          <span className="text-xs text-orange-600 font-medium">⚠ Üle broneeritud</span>
-                        )}
-                        {!wouldOverbook && outOfStock && (
-                          <span className="text-xs text-red-600">🚫 Laos otsas</span>
-                        )}
-                        {!wouldOverbook && lowStock && (
-                          <span className="text-xs text-yellow-600">⚠ Vähe laos</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        Saadaval: {eq.available_quantity}/{eq.total_quantity} · €{Number(eq.daily_rate).toFixed(2)}/päev
-                      </div>
-                      {wouldOverbook && (
-                        <p className="text-xs text-orange-600 mt-1">
-                          Hoiatus: kogus ületab laovaru. Seade märgitakse üle broneerituks.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Quantity input */}
-                    <div className="flex items-center gap-1">
-                      <label className="text-xs text-gray-400">Kogus</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={eqQty[eq.id] || 1}
-                        onChange={e => setEqQty(prev => ({ ...prev, [eq.id]: Number(e.target.value) }))}
-                        className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-
-                    {/* Add button */}
-                    <button
-                      onClick={() => addEquipment(eq.id)}
-                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
-                        isAssigned
-                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                          : wouldOverbook
-                          ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                          : 'bg-primary text-white hover:bg-primary-dark'
-                      }`}
-                    >
-                      {isAssigned ? 'Uuenda' : 'Lisa seade'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-            {filteredEquipment.length === 0 && (
-              <div className="p-4 text-center text-gray-400 text-sm">Seadmeid ei leitud</div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Part D: Assigned Equipment List render helper ────────────────────────────
-
-  function renderAssignedEquipment() {
-    const stageKeys = Object.keys(stageGroups).sort((a, b) => {
-      if (a === 'Määramata lava') return 1
-      if (b === 'Määramata lava') return -1
-      return a.localeCompare(b)
-    })
-
-    return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-4 border-b border-gray-200 font-semibold text-gray-900">
-          Määratud seadmed ({equipment.length})
-        </div>
-        {equipment.length === 0 ? (
-          <div className="p-6 text-center text-gray-400 text-sm">Seadmeid pole lisatud.</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {stageKeys.map(stageName => (
-              <StageSection
-                key={stageName}
-                stageName={stageName}
-                categoryGroups={stageGroups[stageName]}
-                stages={stages}
-                onRemove={removeEquipment}
-                onQtyChange={updateEquipmentQty}
-                onChangeStage={updateEquipmentStage}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
 
   // ─── Return ───────────────────────────────────────────────────────────────────
 
@@ -690,9 +473,53 @@ export default function ProjectDetail() {
       {/* Equipment tab */}
       {tab === 'equipment' && (
         <div className="space-y-4">
-          {renderStageManager()}
-          {renderAssignedEquipment()}
-          {renderEquipmentAssigner()}
+          {/* Add stage */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 flex gap-3 items-center">
+            <input
+              type="text"
+              placeholder="Uue etapi nimi (nt. Lava A, Tehnika, Valgus...)"
+              value={newStageName}
+              onChange={e => setNewStageName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addStage()}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              onClick={addStage}
+              disabled={addingStage || !newStageName.trim()}
+              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              {addingStage ? 'Lisamine...' : '+ Lisa etapp'}
+            </button>
+          </div>
+
+          {/* Stage blocks */}
+          {stages.length === 0 && (
+            <div className="text-center text-gray-400 text-sm py-10 bg-white rounded-xl border border-dashed border-gray-200">
+              Lisa esimene etapp, et alustada seadmete planeerimist.
+            </div>
+          )}
+          {stages.map(stage => (
+            <StageBlock
+              key={stage.id}
+              stage={stage}
+              stageEquipment={equipment.filter(e => e.stage_id === stage.id)}
+              allEquipment={allEquipment}
+              categories={categories}
+              onAdd={addEquipment}
+              onRemove={removeEquipment}
+              onQtyChange={updateEquipmentQty}
+              onDeleteStage={removeStage}
+            />
+          ))}
+
+          {/* Unassigned equipment */}
+          {equipment.filter(e => !e.stage_id).length > 0 && (
+            <UnassignedBlock
+              items={equipment.filter(e => !e.stage_id)}
+              onRemove={removeEquipment}
+              onQtyChange={updateEquipmentQty}
+            />
+          )}
         </div>
       )}
 
@@ -883,62 +710,87 @@ function EquipmentSummary({ equipment }: { equipment: ProjectEquipment[] }) {
   )
 }
 
-// ─── StageSection sub-component ───────────────────────────────────────────────
+// ─── StageBlock sub-component ─────────────────────────────────────────────────
 
-interface StageSectionProps {
-  stageName: string
-  categoryGroups: Record<string, ProjectEquipment[]>
-  stages: Stage[]
+interface StageBlockProps {
+  stage: Stage
+  stageEquipment: ProjectEquipment[]
+  allEquipment: Equipment[]
+  categories: string[]
+  onAdd: (eqId: number, qty: number, stageId: number | null) => void
   onRemove: (id: number) => void
-  onQtyChange: (itemId: number, qty: number) => void
-  onChangeStage: (itemId: number, stageId: number | null) => void
+  onQtyChange: (id: number, qty: number) => void
+  onDeleteStage: (id: number) => void
 }
 
-function StageSection({ stageName, categoryGroups, stages, onRemove, onQtyChange, onChangeStage }: StageSectionProps) {
-  const [open, setOpen] = useState(true)
-  const catKeys = Object.keys(categoryGroups).sort()
+function StageBlock({ stage, stageEquipment, allEquipment, categories, onAdd, onRemove, onQtyChange, onDeleteStage }: StageBlockProps) {
+  const [search, setSearch] = useState('')
+  const [catFilter, setCatFilter] = useState('')
+  const [quantities, setQuantities] = useState<Record<number, number>>({})
+  const [showPicker, setShowPicker] = useState(false)
+
+  const inStageIds = new Set(stageEquipment.map(e => e.equipment_id))
+
+  const filtered = allEquipment.filter(e => {
+    if (inStageIds.has(e.id)) return false
+    const matchSearch = !search || e.name.toLowerCase().includes(search.toLowerCase()) || (e.category_name || '').toLowerCase().includes(search.toLowerCase())
+    const matchCat = !catFilter || e.category_name === catFilter
+    return matchSearch && matchCat
+  })
+
+  const catGroups: Record<string, ProjectEquipment[]> = {}
+  stageEquipment.forEach(item => {
+    const cat = item.category_name || 'Kategooriata'
+    if (!catGroups[cat]) catGroups[cat] = []
+    catGroups[cat].push(item)
+  })
+  const catKeys = Object.keys(catGroups).sort()
 
   return (
-    <div className="border-b border-gray-100 last:border-0">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-      >
-        <span className="font-semibold text-gray-800 text-sm">{stageName}</span>
-        <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
-      </button>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Stage header */}
+      <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-100">
+        <h4 className="font-semibold text-blue-900">{stage.name}</h4>
+        <button
+          onClick={() => onDeleteStage(stage.id)}
+          className="text-xs text-blue-300 hover:text-red-500 transition-colors"
+        >
+          Eemalda etapp
+        </button>
+      </div>
 
-      {open && (
+      {/* Equipment rows by category */}
+      {stageEquipment.length === 0 ? (
+        <div className="px-5 py-4 text-sm text-gray-400 italic">Seadmeid pole veel lisatud.</div>
+      ) : (
         <div>
           {catKeys.map(catName => (
             <div key={catName}>
-              <div className="px-6 py-2 bg-white border-b border-gray-50">
+              <div className="px-5 py-1.5 bg-gray-50 border-b border-gray-100">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{catName}</span>
               </div>
               <table className="w-full text-sm table-fixed">
                 <colgroup>
-                  <col style={{ width: '28%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '20%' }} />
-                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '40%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '8%' }} />
                 </colgroup>
                 <thead className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
                   <tr>
-                    <th className="px-6 py-2 text-left font-medium">Seade</th>
-                    <th className="px-4 py-2 text-center font-medium">Kogus</th>
-                    <th className="px-4 py-2 text-right font-medium">Hind/päev</th>
-                    <th className="px-4 py-2 text-center font-medium">Staatus</th>
-                    <th className="px-4 py-2 text-center font-medium">Lava</th>
-                    <th className="px-4 py-2 text-right font-medium"></th>
+                    <th className="px-5 py-2 text-left font-medium">Seade</th>
+                    <th className="px-3 py-2 text-center font-medium">Kogus</th>
+                    <th className="px-3 py-2 text-right font-medium">Hind/päev</th>
+                    <th className="px-3 py-2 text-center font-medium">Staatus</th>
+                    <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {categoryGroups[catName].map(item => (
+                  {catGroups[catName].map(item => (
                     <tr key={item.id} className={`hover:bg-gray-50 ${item.is_overbooked ? 'bg-red-50 hover:bg-red-100' : ''}`}>
-                      <td className="px-6 py-3 font-medium truncate">{item.equipment_name}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-5 py-3 font-medium truncate">{item.equipment_name}</td>
+                      <td className="px-3 py-3 text-center">
                         <input
                           type="number"
                           min="1"
@@ -952,25 +804,14 @@ function StageSection({ stageName, categoryGroups, stages, onRemove, onQtyChange
                           className="w-16 border border-gray-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-600">€{Number(item.daily_rate || 0).toFixed(2)}/päev</td>
-                      <td className="px-4 py-3 text-center">
-                        {item.is_overbooked ? (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium whitespace-nowrap">Üle broneeritud</span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Saadaval</span>
-                        )}
+                      <td className="px-3 py-3 text-right text-gray-600">€{Number(item.daily_rate || 0).toFixed(2)}/päev</td>
+                      <td className="px-3 py-3 text-center">
+                        {item.is_overbooked
+                          ? <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium whitespace-nowrap">Üle broneeritud</span>
+                          : <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Saadaval</span>
+                        }
                       </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={item.stage_id ?? ''}
-                          onChange={e => onChangeStage(item.id, e.target.value ? Number(e.target.value) : null)}
-                          className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-gray-700"
-                        >
-                          <option value="">— Lava —</option>
-                          {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 text-right">
                         <button onClick={() => onRemove(item.id)} className="text-red-500 hover:text-red-700 text-xs">Eemalda</button>
                       </td>
                     </tr>
@@ -981,6 +822,158 @@ function StageSection({ stageName, categoryGroups, stages, onRemove, onQtyChange
           ))}
         </div>
       )}
+
+      {/* Inline picker toggle */}
+      <div className="border-t border-gray-100">
+        <button
+          onClick={() => setShowPicker(p => !p)}
+          className="w-full px-5 py-3 text-sm text-left text-primary font-medium hover:bg-blue-50 transition-colors flex items-center gap-2"
+        >
+          <span className="text-base leading-none">+</span> Lisa seadmeid laost
+          <span className="ml-auto text-gray-400 text-xs">{showPicker ? '▲' : '▼'}</span>
+        </button>
+
+        {showPicker && (
+          <div className="px-5 pb-4 space-y-3 border-t border-gray-100">
+            <div className="flex gap-3 pt-3">
+              <input
+                type="text"
+                placeholder="Otsi nime või kategooria järgi..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <select
+                value={catFilter}
+                onChange={e => setCatFilter(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Kõik kategooriad</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
+              {filtered.map(eq => {
+                const qty = quantities[eq.id] || 1
+                const wouldOverbook = qty > eq.available_quantity
+                return (
+                  <div key={eq.id} className={`px-4 py-2.5 ${wouldOverbook ? 'bg-yellow-50' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">{eq.name}</span>
+                          {eq.category_name && <span className="text-xs text-gray-400">— {eq.category_name}</span>}
+                          {wouldOverbook && <span className="text-xs text-orange-600 font-medium">⚠ Üle broneeritud</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Saadaval: {eq.available_quantity}/{eq.total_quantity} · €{Number(eq.daily_rate).toFixed(2)}/päev
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-400">Kogus</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={quantities[eq.id] || 1}
+                          onChange={e => setQuantities(prev => ({ ...prev, [eq.id]: Number(e.target.value) }))}
+                          className="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          onAdd(eq.id, quantities[eq.id] || 1, stage.id)
+                          setQuantities(prev => ({ ...prev, [eq.id]: 1 }))
+                        }}
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                          wouldOverbook
+                            ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                            : 'bg-primary text-white hover:bg-primary-dark'
+                        }`}
+                      >
+                        Lisa seade
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+              {filtered.length === 0 && (
+                <div className="p-4 text-center text-gray-400 text-sm">Seadmeid ei leitud</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── UnassignedBlock sub-component ────────────────────────────────────────────
+
+interface UnassignedBlockProps {
+  items: ProjectEquipment[]
+  onRemove: (id: number) => void
+  onQtyChange: (id: number, qty: number) => void
+}
+
+function UnassignedBlock({ items, onRemove, onQtyChange }: UnassignedBlockProps) {
+  const catGroups: Record<string, ProjectEquipment[]> = {}
+  items.forEach(item => {
+    const cat = item.category_name || 'Kategooriata'
+    if (!catGroups[cat]) catGroups[cat] = []
+    catGroups[cat].push(item)
+  })
+  const catKeys = Object.keys(catGroups).sort()
+
+  return (
+    <div className="bg-white rounded-xl border border-dashed border-gray-300 overflow-hidden">
+      <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
+        <h4 className="font-semibold text-gray-500 text-sm">Määramata etapp</h4>
+      </div>
+      {catKeys.map(catName => (
+        <div key={catName}>
+          <div className="px-5 py-1.5 bg-gray-50 border-b border-gray-100">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{catName}</span>
+          </div>
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col style={{ width: '44%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '24%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '8%' }} />
+            </colgroup>
+            <tbody className="divide-y divide-gray-50">
+              {catGroups[catName].map(item => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-5 py-3 font-medium truncate text-gray-600">{item.equipment_name}</td>
+                  <td className="px-3 py-3 text-center">
+                    <input
+                      type="number"
+                      min="1"
+                      key={item.id}
+                      defaultValue={item.quantity}
+                      onBlur={e => {
+                        const v = parseInt(e.target.value)
+                        if (v > 0 && v !== item.quantity) onQtyChange(item.id, v)
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                      className="w-16 border border-gray-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </td>
+                  <td className="px-3 py-3 text-right text-gray-500">€{Number(item.daily_rate || 0).toFixed(2)}/päev</td>
+                  <td className="px-3 py-3 text-center">
+                    <span className="text-xs text-gray-400 italic">—</span>
+                  </td>
+                  <td className="px-3 py-3 text-right">
+                    <button onClick={() => onRemove(item.id)} className="text-red-500 hover:text-red-700 text-xs">Eemalda</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   )
 }
