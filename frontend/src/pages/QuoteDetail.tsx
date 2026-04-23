@@ -293,6 +293,8 @@ export default function QuoteDetail() {
           description: i.description,
           quantity: i.quantity,
           unit_price: i.unit_price,
+          category_name: i.category_name || null,
+          stage_name: i.stage_name || null,
         })),
       })
       toast.success('Arve loodud')

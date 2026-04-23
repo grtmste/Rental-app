@@ -503,6 +503,7 @@ export default function ProjectDetail() {
               key={stage.id}
               stage={stage}
               stageEquipment={equipment.filter(e => e.stage_id === stage.id)}
+              projectEquipment={equipment}
               allEquipment={allEquipment}
               categories={categories}
               onAdd={addEquipment}
@@ -715,6 +716,7 @@ function EquipmentSummary({ equipment }: { equipment: ProjectEquipment[] }) {
 interface StageBlockProps {
   stage: Stage
   stageEquipment: ProjectEquipment[]
+  projectEquipment: ProjectEquipment[]
   allEquipment: Equipment[]
   categories: string[]
   onAdd: (eqId: number, qty: number, stageId: number | null) => void
@@ -723,7 +725,7 @@ interface StageBlockProps {
   onDeleteStage: (id: number) => void
 }
 
-function StageBlock({ stage, stageEquipment, allEquipment, categories, onAdd, onRemove, onQtyChange, onDeleteStage }: StageBlockProps) {
+function StageBlock({ stage, stageEquipment, projectEquipment, allEquipment, categories, onAdd, onRemove, onQtyChange, onDeleteStage }: StageBlockProps) {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
   const [quantities, setQuantities] = useState<Record<number, number>>({})
@@ -731,8 +733,13 @@ function StageBlock({ stage, stageEquipment, allEquipment, categories, onAdd, on
 
   const inStageIds = new Set(stageEquipment.map(e => e.equipment_id))
 
+  // Project-wide booked quantity per equipment item
+  const projectBookedQty: Record<number, number> = {}
+  projectEquipment.forEach(pe => {
+    projectBookedQty[pe.equipment_id] = (projectBookedQty[pe.equipment_id] || 0) + pe.quantity
+  })
+
   const filtered = allEquipment.filter(e => {
-    if (inStageIds.has(e.id)) return false
     const matchSearch = !search || e.name.toLowerCase().includes(search.toLowerCase()) || (e.category_name || '').toLowerCase().includes(search.toLowerCase())
     const matchCat = !catFilter || e.category_name === catFilter
     return matchSearch && matchCat
@@ -856,43 +863,67 @@ function StageBlock({ stage, stageEquipment, allEquipment, categories, onAdd, on
             <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
               {filtered.map(eq => {
                 const qty = quantities[eq.id] || 1
-                const wouldOverbook = qty > eq.available_quantity
+                const booked = projectBookedQty[eq.id] || 0
+                const projectAvailable = eq.total_quantity - booked
+                const wouldOverbook = qty > projectAvailable
+                const alreadyInStage = inStageIds.has(eq.id)
+                const stockLabel = projectAvailable > 0
+                  ? `${projectAvailable} saadaval`
+                  : projectAvailable === 0
+                  ? '0 saadaval'
+                  : 'üle broneeritud'
+                const stockLabelClass = projectAvailable > 0
+                  ? 'text-gray-500'
+                  : projectAvailable === 0
+                  ? 'text-orange-500 font-medium'
+                  : 'text-red-600 font-medium'
+
                 return (
-                  <div key={eq.id} className={`px-4 py-2.5 ${wouldOverbook ? 'bg-yellow-50' : ''}`}>
+                  <div key={eq.id} className={`px-4 py-2.5 ${alreadyInStage ? 'bg-blue-50' : wouldOverbook ? 'bg-yellow-50' : ''}`}>
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm">{eq.name}</span>
+                          <span className={`text-xs ${stockLabelClass}`}>({stockLabel})</span>
                           {eq.category_name && <span className="text-xs text-gray-400">— {eq.category_name}</span>}
-                          {wouldOverbook && <span className="text-xs text-orange-600 font-medium">⚠ Üle broneeritud</span>}
+                          {alreadyInStage && <span className="text-xs text-blue-600 font-medium">Juba lisatud</span>}
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          Saadaval: {eq.available_quantity}/{eq.total_quantity} · €{Number(eq.daily_rate).toFixed(2)}/päev
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          Ladu kokku: {eq.total_quantity} · €{Number(eq.daily_rate).toFixed(2)}/päev
                         </div>
+                        {wouldOverbook && !alreadyInStage && (
+                          <div className="text-xs text-orange-600 mt-0.5">⚠ Kogus ületab laovaru — märgitakse üle broneerituks</div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-gray-400">Kogus</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={quantities[eq.id] || 1}
-                          onChange={e => setQuantities(prev => ({ ...prev, [eq.id]: Number(e.target.value) }))}
-                          className="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <button
-                        onClick={() => {
-                          onAdd(eq.id, quantities[eq.id] || 1, stage.id)
-                          setQuantities(prev => ({ ...prev, [eq.id]: 1 }))
-                        }}
-                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
-                          wouldOverbook
-                            ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                            : 'bg-primary text-white hover:bg-primary-dark'
-                        }`}
-                      >
-                        Lisa seade
-                      </button>
+                      {!alreadyInStage && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-gray-400">Kogus</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={quantities[eq.id] || 1}
+                            onChange={e => setQuantities(prev => ({ ...prev, [eq.id]: Number(e.target.value) }))}
+                            className="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      )}
+                      {alreadyInStage ? (
+                        <span className="px-3 py-1.5 rounded text-xs font-medium bg-blue-100 text-blue-600 whitespace-nowrap">Lisatud ✓</span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            onAdd(eq.id, quantities[eq.id] || 1, stage.id)
+                            setQuantities(prev => ({ ...prev, [eq.id]: 1 }))
+                          }}
+                          className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                            wouldOverbook
+                              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                              : 'bg-primary text-white hover:bg-primary-dark'
+                          }`}
+                        >
+                          Lisa seade
+                        </button>
+                      )}
                     </div>
                   </div>
                 )

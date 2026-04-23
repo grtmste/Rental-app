@@ -99,9 +99,10 @@ const create = async (req, res, next) => {
 
     for (const item of processedItems) {
       await dbClient.query(
-        `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, line_total)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [invoice.id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total]
+        `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, line_total, category_name, stage_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [invoice.id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total,
+         item.category_name || null, item.stage_name || null]
       );
     }
 
@@ -165,9 +166,10 @@ const update = async (req, res, next) => {
       await dbClient.query('DELETE FROM invoice_items WHERE invoice_id = $1', [id]);
       for (const item of processedItems) {
         await dbClient.query(
-          `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, line_total)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total]
+          `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, line_total, category_name, stage_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total,
+           item.category_name || null, item.stage_name || null]
         );
       }
     }

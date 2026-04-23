@@ -41,6 +41,8 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE project_equipment DROP CONSTRAINT IF EXISTS project_equipment_project_id_equipment_id_key`);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pe_unique_staged ON project_equipment (project_id, equipment_id, stage_id) WHERE stage_id IS NOT NULL`);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pe_unique_unstaged ON project_equipment (project_id, equipment_id) WHERE stage_id IS NULL`);
+    await pool.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS category_name VARCHAR(255)`);
+    await pool.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS stage_name VARCHAR(255)`);
     console.log('✅ Migrations applied');
   } catch (err) {
     console.error('⚠️  Migration error:', err.message);
