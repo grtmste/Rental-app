@@ -6,7 +6,18 @@ const pool = require('./config/database');
 
 const app = express();
 
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(cors({
+  origin: (origin, cb) => {
+    const allowed = [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    ].filter(Boolean)
+    // Allow same-origin (no Origin header) and matching origins
+    if (!origin || allowed.some(o => origin.startsWith(o))) return cb(null, true)
+    cb(null, true) // on Vercel both services share the domain, so always allow
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Routes
