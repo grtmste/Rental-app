@@ -37,7 +37,7 @@ export default function Register() {
       toast.success('Konto loodud! Palun logi sisse.')
       navigate('/login')
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Registreerimine ebaõnnestus. Palun proovi uuesti.'
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Registreerimine ebaõnnestus. Palun proovi uuesti.'
       setError(msg)
       toast.error(msg)
     } finally {

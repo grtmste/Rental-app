@@ -31,6 +31,15 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/clients', require('./routes/clients'));
 app.use('/api/analytics', require('./routes/analytics'));
 
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: 'connected' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', db: 'disconnected', detail: err.message });
+  }
+});
+
 app.use(require('./middleware/errorHandler'));
 
 async function runMigrations() {
