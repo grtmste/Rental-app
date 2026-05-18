@@ -1,6 +1,11 @@
 {
   "buildCommand": "(cd backend && npm install) && (cd frontend && npm install --include=dev && npm run build)",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "backend/.env"
+    }
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/:path*", "destination": "/index.html" }
