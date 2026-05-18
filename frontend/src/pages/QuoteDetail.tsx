@@ -15,6 +15,11 @@ interface QuoteItem {
   stage_name?: string
 }
 interface Client { id: number; name: string; company: string; email: string; address: string }
+interface CrewCost {
+  total_cost: number
+  total_hours: number
+  crew_count: number
+}
 
 const COMPANY = {
   name: 'Stereo Sound OÜ',
@@ -44,6 +49,8 @@ export default function QuoteDetail() {
   const [sendSubject, setSendSubject] = useState('')
   const [sendMessage, setSendMessage] = useState('')
   const [sending, setSending] = useState(false)
+
+  const [crewCost, setCrewCost] = useState<CrewCost | null>(null)
 
   // Picking list
   const [pickingListMode, setPickingListMode] = useState(false)
@@ -129,6 +136,15 @@ export default function QuoteDetail() {
         category_name: i.category_name || '',
         stage_name: i.stage_name || '',
       })) || [])
+      if (q.crew_cost && Number(q.crew_cost.total_cost) > 0) {
+        setCrewCost({
+          total_cost: Number(q.crew_cost.total_cost),
+          total_hours: Number(q.crew_cost.total_hours),
+          crew_count: Number(q.crew_cost.crew_count),
+        })
+      } else {
+        setCrewCost(null)
+      }
     } catch {
       toast.error('Pakkumise laadimine ebaõnnestus')
     }
@@ -175,7 +191,9 @@ export default function QuoteDetail() {
     setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
-  const subtotal = items.reduce((sum, i) => sum + Number(i.line_total), 0)
+  const itemsSubtotal = items.reduce((sum, i) => sum + Number(i.line_total), 0)
+  const crewCostTotal = crewCost && Number(crewCost.total_cost) > 0 ? Number(crewCost.total_cost) : 0
+  const subtotal = itemsSubtotal + crewCostTotal
   const vatAmount = subtotal * (Number(form.vat_rate) / 100)
   const total = subtotal + vatAmount
 
@@ -582,6 +600,33 @@ export default function QuoteDetail() {
               </div>
             )
           })()}
+
+          {/* Teostus (Crew Cost) row */}
+          {crewCost && crewCostTotal > 0 && (
+            <div className="mb-4">
+              <div className="font-semibold text-gray-700 text-sm border-b border-gray-300 pb-1 mb-1">Teostus</div>
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="bg-blue-50 border border-blue-100 rounded">
+                    <td className="py-2 pl-2 font-medium text-gray-800">Teostus</td>
+                    <td className="py-1.5 text-right text-gray-500 w-16">
+                      {crewCost.total_hours > 0 ? `× ${Number(crewCost.total_hours).toFixed(1)} h` : `× 1`}
+                    </td>
+                    <td className="py-1.5 text-right text-gray-700 w-28">
+                      €{crewCost.total_hours > 0
+                        ? (crewCostTotal / crewCost.total_hours).toFixed(2)
+                        : crewCostTotal.toFixed(2)}/
+                      {crewCost.total_hours > 0 ? 'h' : 'tk'}
+                    </td>
+                    <td className="py-1.5 text-right font-medium w-24">€{crewCostTotal.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="flex justify-end mt-1">
+                <span className="text-sm font-medium text-gray-600">Teostus kokku: €{crewCostTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Totals */}
           <div className="flex justify-end mb-6">

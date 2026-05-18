@@ -40,6 +40,21 @@ const getOne = async (req, res, next) => {
     const quote = quoteResult.rows[0];
     quote.items = itemsResult.rows;
 
+    // Fetch crew cost if quote is linked to a project
+    if (quote.project_id) {
+      const crewResult = await pool.query(
+        `SELECT COALESCE(SUM(CASE WHEN pcm.hours > 0 THEN pcm.hours * pcm.rate_per_hour ELSE pcm.rate_per_hour END), 0) as total_cost,
+                COALESCE(SUM(pcm.hours), 0) as total_hours,
+                COUNT(pcm.id) as crew_count
+         FROM project_crew_members pcm
+         WHERE pcm.project_id = $1`,
+        [quote.project_id]
+      );
+      quote.crew_cost = crewResult.rows[0];
+    } else {
+      quote.crew_cost = null;
+    }
+
     res.json(quote);
   } catch (err) {
     next(err);

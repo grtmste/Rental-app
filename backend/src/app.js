@@ -27,6 +27,8 @@ app.use('/api/quotes', require('./routes/quotes'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/clients', require('./routes/clients'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/inventory', require('./routes/inventory'));
+app.use('/api/project-statuses', require('./routes/projectStatuses'));
 
 app.get('/api/health', async (req, res) => {
   try {

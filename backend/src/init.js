@@ -62,6 +62,26 @@ async function runMigrations() {
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pe_unique_unstaged ON project_equipment (project_id, equipment_id) WHERE stage_id IS NULL`);
     await pool.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS category_name VARCHAR(255)`);
     await pool.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS stage_name VARCHAR(255)`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_statuses (
+        id SERIAL PRIMARY KEY,
+        key VARCHAR(50) NOT NULL UNIQUE,
+        label VARCHAR(255) NOT NULL,
+        color VARCHAR(50) NOT NULL DEFAULT 'gray',
+        sort_order INTEGER DEFAULT 0,
+        is_default BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      INSERT INTO project_statuses (key, label, color, sort_order, is_default)
+      VALUES
+        ('draft', 'Mustand', 'gray', 0, true),
+        ('confirmed', 'Kinnitatud', 'blue', 1, true),
+        ('in_progress', 'Töös', 'orange', 2, true),
+        ('completed', 'Lõpetatud', 'green', 3, true)
+      ON CONFLICT (key) DO NOTHING
+    `);
     console.log('✅ Migrations applied');
   } catch (err) {
     console.error('⚠️  Migration error:', err.message);
