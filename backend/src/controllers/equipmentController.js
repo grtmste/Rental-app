@@ -3,6 +3,7 @@ const QRCode = require('qrcode');
 
 const getAll = async (req, res, next) => {
   try {
+    const today = new Date().toISOString().split('T')[0];
     const result = await pool.query(`
       SELECT
         e.*,
@@ -10,7 +11,9 @@ const getAll = async (req, res, next) => {
         COALESCE(
           e.total_quantity - COALESCE(
             SUM(pe.quantity) FILTER (
-              WHERE p.status IN ('confirmed', 'in_progress') AND pe.project_id IS NOT NULL
+              WHERE p.status IN ('confirmed', 'in_progress')
+              AND p.start_date <= $1::date
+              AND p.end_date >= $1::date
             ), 0
           ),
           e.total_quantity
@@ -21,7 +24,7 @@ const getAll = async (req, res, next) => {
       LEFT JOIN projects p ON pe.project_id = p.id
       GROUP BY e.id, c.name
       ORDER BY e.name ASC
-    `);
+    `, [today]);
     res.json(result.rows);
   } catch (err) {
     next(err);
@@ -31,6 +34,7 @@ const getAll = async (req, res, next) => {
 const getOne = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const today = new Date().toISOString().split('T')[0];
     const result = await pool.query(`
       SELECT
         e.*,
@@ -38,7 +42,9 @@ const getOne = async (req, res, next) => {
         COALESCE(
           e.total_quantity - COALESCE(
             SUM(pe.quantity) FILTER (
-              WHERE p.status IN ('confirmed', 'in_progress') AND pe.project_id IS NOT NULL
+              WHERE p.status IN ('confirmed', 'in_progress')
+              AND p.start_date <= $2::date
+              AND p.end_date >= $2::date
             ), 0
           ),
           e.total_quantity
@@ -49,7 +55,7 @@ const getOne = async (req, res, next) => {
       LEFT JOIN projects p ON pe.project_id = p.id
       WHERE e.id = $1
       GROUP BY e.id, c.name
-    `, [id]);
+    `, [id, today]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Equipment not found.' });

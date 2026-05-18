@@ -7,6 +7,7 @@ import {
   QrCodeIcon,
   ClipboardDocumentListIcon,
   XMarkIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline'
 import api from '../utils/api'
 import toast from 'react-hot-toast'
@@ -37,6 +38,15 @@ interface LogEntry {
   project_name: string
   user_name: string
   created_at: string
+}
+
+interface AvailabilityItem {
+  equipment_id: number
+  name: string
+  category_name: string | null
+  total_quantity: number
+  booked_qty: number
+  available_qty: number
 }
 
 const conditionColors: Record<string, string> = {
@@ -82,6 +92,12 @@ export default function EquipmentPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
 
+  // Availability calendar state
+  const [showAvailCalendar, setShowAvailCalendar] = useState(false)
+  const [availDate, setAvailDate] = useState(new Date().toISOString().split('T')[0])
+  const [availData, setAvailData] = useState<AvailabilityItem[]>([])
+  const [availLoading, setAvailLoading] = useState(false)
+
   const fetchData = useCallback(async () => {
     try {
       const [eqRes, catRes] = await Promise.all([
@@ -99,6 +115,22 @@ export default function EquipmentPage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const fetchAvailability = useCallback(async (date: string) => {
+    setAvailLoading(true)
+    try {
+      const res = await api.get(`/inventory/availability?date=${date}`)
+      setAvailData(res.data || [])
+    } catch {
+      toast.error('Varude kalendri laadimine ebaõnnestus')
+    } finally {
+      setAvailLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (showAvailCalendar) fetchAvailability(availDate)
+  }, [showAvailCalendar, availDate, fetchAvailability])
 
   const filtered = equipment.filter((e) => {
     const q = search.toLowerCase()
@@ -222,14 +254,82 @@ export default function EquipmentPage() {
           <h1 className="text-2xl font-bold text-gray-900">Seadmed</h1>
           <p className="text-sm text-gray-500">{equipment.length} seadet laos</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Lisa seade
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowAvailCalendar(v => !v)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${showAvailCalendar ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+          >
+            <CalendarDaysIcon className="h-4 w-4" />
+            Varude kalender
+          </button>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Lisa seade
+          </button>
+        </div>
       </div>
+
+      {/* ── Availability Calendar ── */}
+      {showAvailCalendar && (
+        <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Varude kalender</h2>
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600 font-medium">Kuupäev:</label>
+              <input
+                type="date"
+                value={availDate}
+                onChange={e => setAvailDate(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          </div>
+          {availLoading ? (
+            <div className="flex items-center justify-center h-24">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : availData.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">Seadmeid ei leitud</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 text-xs uppercase border-b border-gray-100">
+                    <th className="text-left px-4 py-2">Seade</th>
+                    <th className="text-left px-4 py-2">Kategooria</th>
+                    <th className="text-center px-4 py-2">Kokku</th>
+                    <th className="text-center px-4 py-2">Broneeritud</th>
+                    <th className="text-center px-4 py-2">Saadaval</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {availData.map(item => {
+                    const avail = Number(item.available_qty)
+                    const total = Number(item.total_quantity)
+                    const availClass = avail === 0
+                      ? 'text-red-600 font-bold'
+                      : avail < total
+                        ? 'text-yellow-600 font-semibold'
+                        : 'text-green-600 font-semibold'
+                    return (
+                      <tr key={item.equipment_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-900">{item.name}</td>
+                        <td className="px-4 py-2.5 text-gray-500">{item.category_name || '—'}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700">{total}</td>
+                        <td className="px-4 py-2.5 text-center text-gray-700">{Number(item.booked_qty)}</td>
+                        <td className={`px-4 py-2.5 text-center ${availClass}`}>{avail}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">

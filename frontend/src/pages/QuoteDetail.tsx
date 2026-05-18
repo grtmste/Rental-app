@@ -416,10 +416,17 @@ export default function QuoteDetail() {
 
       {/* ── Quote Document ── */}
       <div className={pickingListMode ? 'hidden' : ''}>
-        <div ref={printRef} className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 max-w-4xl mx-auto print:shadow-none print:border-none print:rounded-none print:max-w-none print:p-6">
+        <div ref={printRef} className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 max-w-4xl mx-auto print:shadow-none print:border-none print:rounded-none print:max-w-none print:p-6" style={{ fontFamily: 'Arial, sans-serif' }}>
           {/* Quote header */}
           <div className="flex justify-between items-start mb-8">
             <div>
+              <img
+                src="/STEREOSOUNDLOGO.svg"
+                alt="Stereo Sound"
+                style={{ height: '48px', marginBottom: '8px' }}
+                crossOrigin="anonymous"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
               <h1 className="text-2xl font-bold text-primary">{COMPANY.name}</h1>
               <p className="text-sm text-gray-500 mt-1">{COMPANY.address}</p>
               <p className="text-sm text-gray-500">{COMPANY.email} · {COMPANY.phone}</p>
