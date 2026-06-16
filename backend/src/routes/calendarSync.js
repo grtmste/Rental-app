@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const auth = require('../middleware/auth');
-const { getSettings } = require('../utils/googleCalendar');
+const { getSettings, syncProject, isEnabled } = require('../utils/googleCalendar');
 
 // GET /api/calendar-sync/settings
 // Returns the calendar_settings row (creating a default if missing) +
@@ -54,6 +54,34 @@ router.put('/members/:userId', auth, async (req, res, next) => {
     res.json(result.rows[0]);
   } catch (err) {
     next(err);
+  }
+});
+
+// POST /api/calendar-sync/test-connection
+// Runs a real sync on the most recent project and returns detailed success/error info.
+router.post('/test-connection', auth, async (req, res, next) => {
+  try {
+    if (!isEnabled()) {
+      return res.json({ ok: false, message: 'GOOGLE_CALENDAR_ENABLED on puudu või ei ole "true". Kontrolli Vercel keskkonna muutujaid.' });
+    }
+
+    const settings = await getSettings();
+    if (!settings || !settings.enabled) {
+      return res.json({ ok: false, message: 'Sünkroonimine on seadetest välja lülitatud. Luba "Sünkroonimine lubatud" ja salvesta.' });
+    }
+    if (!settings.master_calendar_id) {
+      return res.json({ ok: false, message: 'Peakalendri ID on tühi. Sisesta kalendri ID ja salvesta.' });
+    }
+
+    const latest = await pool.query('SELECT id FROM projects ORDER BY created_at DESC LIMIT 1');
+    if (latest.rows.length === 0) {
+      return res.json({ ok: false, message: 'Testiks pole ühtegi projekti. Loo esmalt projekt.' });
+    }
+
+    await syncProject(latest.rows[0].id);
+    res.json({ ok: true, message: 'Sünkroonimine õnnestus! Sündmus peaks Google Calendaris nähtav olema.' });
+  } catch (err) {
+    res.json({ ok: false, message: err.message || String(err) });
   }
 });
 

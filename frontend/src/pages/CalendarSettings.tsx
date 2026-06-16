@@ -24,6 +24,8 @@ export default function CalendarSettings() {
   const [enabled, setEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
   const [memberEdits, setMemberEdits] = useState<Record<number, string>>({})
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   useEffect(() => { fetchSettings() }, [])
 
@@ -55,6 +57,19 @@ export default function CalendarSettings() {
       toast.error('Seadete salvestamine ebaõnnestus')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function testConnection() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await api.post('/calendar-sync/test-connection')
+      setTestResult(res.data)
+    } catch (err: any) {
+      setTestResult({ ok: false, message: err?.response?.data?.error || err?.message || 'Tundmatu viga' })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -100,11 +115,23 @@ export default function CalendarSettings() {
           <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="h-4 w-4" />
           <span className="text-gray-700">Sünkroonimine lubatud</span>
         </label>
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <button
+            onClick={testConnection}
+            disabled={testing}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60"
+          >
+            {testing ? 'Testimine...' : 'Testi ühendust'}
+          </button>
           <button onClick={saveSettings} disabled={saving} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-60">
             {saving ? 'Salvestamine...' : 'Salvesta seaded'}
           </button>
         </div>
+        {testResult && (
+          <div className={`mt-2 p-3 rounded-lg text-sm ${testResult.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            <span className="font-semibold">{testResult.ok ? '✓ ' : '✗ '}</span>{testResult.message}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
