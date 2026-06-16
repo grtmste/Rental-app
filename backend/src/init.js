@@ -82,6 +82,65 @@ async function runMigrations() {
         ('completed', 'Lõpetatud', 'green', 3, true)
       ON CONFLICT (key) DO NOTHING
     `);
+
+    // ── Feature 2: event_name on quotes & invoices ──
+    await pool.query(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS event_name VARCHAR(255)`);
+    await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS event_name VARCHAR(255)`);
+
+    // ── Feature 5: item_type on items, discount_pct on quotes & invoices ──
+    await pool.query(`ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(20) NOT NULL DEFAULT 'equipment'`);
+    await pool.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(20) NOT NULL DEFAULT 'equipment'`);
+    await pool.query(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0`);
+
+    // ── Feature 6: project templates ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_templates (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_template_stages (
+        id SERIAL PRIMARY KEY,
+        template_id INTEGER NOT NULL REFERENCES project_templates(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        sort_order INTEGER DEFAULT 0
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_template_items (
+        id SERIAL PRIMARY KEY,
+        template_stage_id INTEGER NOT NULL REFERENCES project_template_stages(id) ON DELETE CASCADE,
+        equipment_id INTEGER NOT NULL REFERENCES equipment(id) ON DELETE CASCADE,
+        quantity INTEGER NOT NULL DEFAULT 1
+      )
+    `);
+
+    // ── Feature 7: Google Calendar sync scaffolding ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS calendar_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        master_calendar_id VARCHAR(255),
+        enabled BOOLEAN DEFAULT false,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CHECK (id = 1)
+      )
+    `);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_calendar_id VARCHAR(255)`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_calendar_events (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        calendar_id VARCHAR(255) NOT NULL,
+        event_id VARCHAR(255) NOT NULL,
+        member_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     console.log('✅ Migrations applied');
   } catch (err) {
     console.error('⚠️  Migration error:', err.message);

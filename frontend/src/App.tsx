@@ -22,6 +22,8 @@ import CRM from './pages/CRM'
 import ClientDetail from './pages/ClientDetail'
 import Analytics from './pages/Analytics'
 import Categories from './pages/Categories'
+import ProjectTemplates from './pages/ProjectTemplates'
+import CalendarSettings from './pages/CalendarSettings'
 
 export default function App() {
   return (
@@ -59,6 +61,8 @@ export default function App() {
               <Route path="/app/crm/:id" element={<ClientDetail />} />
               <Route path="/app/analytics" element={<Analytics />} />
               <Route path="/app/categories" element={<Categories />} />
+              <Route path="/app/templates" element={<ProjectTemplates />} />
+              <Route path="/app/calendar-settings" element={<CalendarSettings />} />
             </Route>
           </Route>
 

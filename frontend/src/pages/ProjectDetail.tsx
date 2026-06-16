@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
@@ -380,6 +380,17 @@ export default function ProjectDetail() {
     navigate(`/app/quotes/new?project_id=${id}`)
   }
 
+  async function saveAsTemplate() {
+    const name = window.prompt('Malli nimi:', project?.name ? `${project.name} (mall)` : '')
+    if (!name || !name.trim()) return
+    try {
+      await api.post(`/project-templates/from-project/${id}`, { name: name.trim() })
+      toast.success('Mall salvestatud')
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Malli salvestamine ebaõnnestus')
+    }
+  }
+
   // ─── Derived data ─────────────────────────────────────────────────────────────
 
 
@@ -416,6 +427,9 @@ export default function ProjectDetail() {
         <div className="flex items-center gap-3">
           <button onClick={createQuote} className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-dark transition-colors">
             + Loo pakkumine
+          </button>
+          <button onClick={saveAsTemplate} className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            Salvesta mallina
           </button>
           {NEXT_STATUS[project.status] && (
             <button onClick={() => updateStatus(NEXT_STATUS[project.status])} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors">
@@ -728,8 +742,15 @@ interface StageBlockProps {
 function StageBlock({ stage, stageEquipment, projectEquipment, allEquipment, categories, onAdd, onRemove, onQtyChange, onDeleteStage }: StageBlockProps) {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
-  const [quantities, setQuantities] = useState<Record<number, number>>({})
   const [showPicker, setShowPicker] = useState(false)
+
+  // Feature 1: keyboard-friendly add flow
+  const [selectedEqId, setSelectedEqId] = useState<number | null>(null)
+  const [addQty, setAddQty] = useState<number>(1)
+  const [highlightIndex, setHighlightIndex] = useState<number>(0)
+  const [validationMsg, setValidationMsg] = useState<string>('')
+  const searchRef = useRef<HTMLInputElement>(null)
+  const qtyRef = useRef<HTMLInputElement>(null)
 
   const inStageIds = new Set(stageEquipment.map(e => e.equipment_id))
 
@@ -744,6 +765,56 @@ function StageBlock({ stage, stageEquipment, projectEquipment, allEquipment, cat
     const matchCat = !catFilter || e.category_name === catFilter
     return matchSearch && matchCat
   })
+
+  // Items that can still be selected (not already in this stage)
+  const selectable = filtered.filter(e => !inStageIds.has(e.id))
+
+  // Keep highlight index in bounds when the filtered list changes
+  useEffect(() => {
+    if (highlightIndex >= selectable.length) setHighlightIndex(selectable.length > 0 ? selectable.length - 1 : 0)
+  }, [selectable.length])
+
+  function selectEquipment(eqId: number) {
+    setSelectedEqId(eqId)
+    setValidationMsg('')
+    // move focus to qty for quick entry
+    setTimeout(() => qtyRef.current?.focus(), 0)
+  }
+
+  function performAdd() {
+    if (!selectedEqId) {
+      setValidationMsg('Vali esmalt seade')
+      return
+    }
+    const qty = parseInt(String(addQty), 10)
+    if (!qty || qty < 1) {
+      setValidationMsg('Kogus peab olema vähemalt 1')
+      return
+    }
+    onAdd(selectedEqId, qty, stage.id)
+    // Reset for rapid entry: clear search, reset qty, keep focus in search
+    setValidationMsg('')
+    setSelectedEqId(null)
+    setAddQty(1)
+    setSearch('')
+    setHighlightIndex(0)
+    setTimeout(() => searchRef.current?.focus(), 0)
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightIndex(i => Math.min(i + 1, Math.max(selectable.length - 1, 0)))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightIndex(i => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const target = selectable[highlightIndex] || selectable[0]
+      if (target) selectEquipment(target.id)
+      else setValidationMsg('Vali esmalt seade')
+    }
+  }
 
   const catGroups: Record<string, ProjectEquipment[]> = {}
   stageEquipment.forEach(item => {
@@ -844,15 +915,17 @@ function StageBlock({ stage, stageEquipment, projectEquipment, allEquipment, cat
           <div className="px-5 pb-4 space-y-3 border-t border-gray-100">
             <div className="flex gap-3 pt-3">
               <input
+                ref={searchRef}
                 type="text"
-                placeholder="Otsi nime või kategooria järgi..."
+                placeholder="Otsi nime või kategooria järgi... (Enter valib)"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => { setSearch(e.target.value); setHighlightIndex(0); setValidationMsg('') }}
+                onKeyDown={handleSearchKeyDown}
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <select
                 value={catFilter}
-                onChange={e => setCatFilter(e.target.value)}
+                onChange={e => { setCatFilter(e.target.value); setHighlightIndex(0) }}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">Kõik kategooriad</option>
@@ -860,13 +933,44 @@ function StageBlock({ stage, stageEquipment, projectEquipment, allEquipment, cat
               </select>
             </div>
 
+            {/* Quantity + add bar (keyboard-friendly) */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Kogus</span>
+              <input
+                ref={qtyRef}
+                type="number"
+                min="1"
+                step="1"
+                value={addQty}
+                onFocus={e => e.target.select()}
+                onChange={e => { setAddQty(parseInt(e.target.value, 10) || 0); setValidationMsg('') }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); performAdd() } }}
+                className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                onClick={performAdd}
+                disabled={!selectedEqId}
+                className="px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
+              >
+                Lisa seade
+              </button>
+              {selectedEqId && (
+                <span className="text-xs text-gray-600">
+                  Valitud: {allEquipment.find(e => e.id === selectedEqId)?.name}
+                </span>
+              )}
+              {validationMsg && <span className="text-xs text-red-600 font-medium">{validationMsg}</span>}
+            </div>
+
             <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
               {filtered.map(eq => {
-                const qty = quantities[eq.id] || 1
                 const booked = projectBookedQty[eq.id] || 0
                 const projectAvailable = eq.total_quantity - booked
-                const wouldOverbook = qty > projectAvailable
+                const wouldOverbook = addQty > projectAvailable
                 const alreadyInStage = inStageIds.has(eq.id)
+                const selectableIndex = selectable.findIndex(s => s.id === eq.id)
+                const isHighlighted = !alreadyInStage && selectableIndex === highlightIndex
+                const isSelected = selectedEqId === eq.id
                 const stockLabel = projectAvailable > 0
                   ? `${projectAvailable} saadaval`
                   : projectAvailable === 0
@@ -879,7 +983,11 @@ function StageBlock({ stage, stageEquipment, projectEquipment, allEquipment, cat
                   : 'text-red-600 font-medium'
 
                 return (
-                  <div key={eq.id} className={`px-4 py-2.5 ${alreadyInStage ? 'bg-blue-50' : wouldOverbook ? 'bg-yellow-50' : ''}`}>
+                  <div
+                    key={eq.id}
+                    onClick={() => !alreadyInStage && selectEquipment(eq.id)}
+                    className={`px-4 py-2.5 ${alreadyInStage ? 'bg-blue-50' : isSelected ? 'bg-primary/10 ring-1 ring-primary cursor-pointer' : isHighlighted ? 'bg-blue-100 cursor-pointer' : wouldOverbook ? 'bg-yellow-50 cursor-pointer' : 'cursor-pointer'}`}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -895,26 +1003,11 @@ function StageBlock({ stage, stageEquipment, projectEquipment, allEquipment, cat
                           <div className="text-xs text-orange-600 mt-0.5">⚠ Kogus ületab laovaru — märgitakse üle broneerituks</div>
                         )}
                       </div>
-                      {!alreadyInStage && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-gray-400">Kogus</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={quantities[eq.id] || 1}
-                            onChange={e => setQuantities(prev => ({ ...prev, [eq.id]: Number(e.target.value) }))}
-                            className="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                      )}
                       {alreadyInStage ? (
                         <span className="px-3 py-1.5 rounded text-xs font-medium bg-blue-100 text-blue-600 whitespace-nowrap">Lisatud ✓</span>
                       ) : (
                         <button
-                          onClick={() => {
-                            onAdd(eq.id, quantities[eq.id] || 1, stage.id)
-                            setQuantities(prev => ({ ...prev, [eq.id]: 1 }))
-                          }}
+                          onClick={e => { e.stopPropagation(); setSelectedEqId(eq.id); setValidationMsg(''); onAdd(eq.id, (parseInt(String(addQty), 10) >= 1 ? parseInt(String(addQty), 10) : 1), stage.id); setSearch(''); setHighlightIndex(0); setSelectedEqId(null); setAddQty(1); setTimeout(() => searchRef.current?.focus(), 0) }}
                           className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
                             wouldOverbook
                               ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'

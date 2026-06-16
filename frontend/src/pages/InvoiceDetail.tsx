@@ -5,6 +5,8 @@ import api from '../utils/api'
 // @ts-ignore
 import html2pdf from 'html2pdf.js'
 
+type ItemType = 'equipment' | 'transport' | 'labor' | 'custom'
+
 interface InvoiceItem {
   id?: number
   description: string
@@ -13,7 +15,16 @@ interface InvoiceItem {
   line_total: number
   category_name?: string
   stage_name?: string
+  item_type?: ItemType
 }
+
+const ITEM_TYPE_LABELS: Record<ItemType, string> = {
+  equipment: 'Seade',
+  transport: 'Transport',
+  labor: 'Tööjõud',
+  custom: 'Muu',
+}
+
 interface Client { id: number; name: string; company: string; email: string; address: string }
 
 const COMPANY = {
@@ -54,8 +65,10 @@ export default function InvoiceDetail() {
     due_date: '',
     notes: '',
     vat_rate: 20,
+    discount_pct: 0,
+    event_name: '',
   })
-  const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unit_price: 0, line_total: 0 }])
+  const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unit_price: 0, line_total: 0, item_type: 'equipment' }])
 
   useEffect(() => {
     api.get('/clients').then(r => setClients(r.data)).catch(() => {})
@@ -90,6 +103,8 @@ export default function InvoiceDetail() {
         due_date: inv.due_date ? inv.due_date.split('T')[0] : '',
         notes: inv.notes || '',
         vat_rate: Number(inv.vat_rate) || 20,
+        discount_pct: Number(inv.discount_pct) || 0,
+        event_name: inv.event_name || inv.project_name || '',
       })
       setItems(inv.items?.map((i: any) => ({
         id: i.id,
@@ -99,6 +114,7 @@ export default function InvoiceDetail() {
         line_total: Number(i.line_total),
         category_name: i.category_name || '',
         stage_name: i.stage_name || '',
+        item_type: (i.item_type as ItemType) || 'equipment',
       })) || [])
     } catch {
       toast.error('Arve laadimine ebaõnnestus')
@@ -118,14 +134,19 @@ export default function InvoiceDetail() {
   }
 
   function addItem() {
-    setItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, line_total: 0, category_name: '', stage_name: '' }])
+    setItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, line_total: 0, category_name: '', stage_name: '', item_type: 'equipment' }])
   }
 
   function removeItem(idx: number) {
     setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
-  const subtotal = items.reduce((sum, i) => sum + Number(i.line_total), 0)
+  // Feature 5: equipment-only discount
+  const equipmentSubtotal = items.reduce((sum, i) => sum + ((i.item_type || 'equipment') === 'equipment' ? Number(i.line_total) : 0), 0)
+  const serviceSubtotal = items.reduce((sum, i) => sum + ((i.item_type || 'equipment') !== 'equipment' ? Number(i.line_total) : 0), 0)
+  const discountPct = Number(form.discount_pct) || 0
+  const discountAmount = equipmentSubtotal * (discountPct / 100)
+  const subtotal = (equipmentSubtotal - discountAmount) + serviceSubtotal
   const vatAmount = subtotal * (Number(form.vat_rate) / 100)
   const total = subtotal + vatAmount
 
@@ -272,6 +293,22 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
+        {/* ── Event name (Sündmus) — prominent + printable ── */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 no-print">
+            <label className="text-xs font-semibold text-gray-400 uppercase">Sündmus</label>
+            <input
+              value={form.event_name}
+              onChange={e => setForm(f => ({ ...f, event_name: e.target.value }))}
+              placeholder="Sündmuse nimi..."
+              className="flex-1 border border-gray-200 rounded px-3 py-2 text-base font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          {form.event_name && (
+            <div className="print-only hidden text-lg font-semibold text-gray-800">Sündmus: {form.event_name}</div>
+          )}
+        </div>
+
         {/* ── Client + meta ── */}
         <div className="grid grid-cols-2 gap-8 mb-8">
           <div>
@@ -333,6 +370,7 @@ export default function InvoiceDetail() {
           <table className="w-full mb-2">
             <thead>
               <tr className="border-b-2 border-gray-200">
+                <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase w-24">Tüüp</th>
                 <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase">Kirjeldus</th>
                 <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase w-28">Etapp</th>
                 <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase w-28">Kategooria</th>
@@ -345,6 +383,17 @@ export default function InvoiceDetail() {
             <tbody>
               {items.map((item, idx) => (
                 <tr key={idx} className="border-b border-gray-100">
+                  <td className="py-2 pr-2">
+                    <select
+                      value={item.item_type || 'equipment'}
+                      onChange={e => updateItem(idx, 'item_type', e.target.value)}
+                      className="w-full border border-gray-200 rounded px-1 py-1 text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      {(Object.keys(ITEM_TYPE_LABELS) as ItemType[]).map(t => (
+                        <option key={t} value={t}>{ITEM_TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="py-2 pr-2">
                     <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Kirjeldus..." className="w-full border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none py-1 text-sm" />
                   </td>
@@ -392,7 +441,6 @@ export default function InvoiceDetail() {
                   )}
                   {sortedCats.map(catName => {
                     const catItems = catMap[catName].slice().sort((a, b) => a.description.localeCompare(b.description))
-                    const catTotal = catItems.reduce((s, i) => s + Number(i.line_total), 0)
                     return (
                       <div key={catName || '__none'} className={stageName ? 'border-l border-r border-gray-200' : ''}>
                         {catName && (
@@ -419,14 +467,6 @@ export default function InvoiceDetail() {
                               </tr>
                             ))}
                           </tbody>
-                          {catName && (
-                            <tfoot>
-                              <tr className="border-t border-gray-200 bg-gray-50">
-                                <td colSpan={3} className="px-4 py-1.5 text-xs text-gray-500 text-right">{catName} kokku</td>
-                                <td className="px-3 py-1.5 text-right text-xs font-semibold text-gray-700">€{catTotal.toFixed(2)}</td>
-                              </tr>
-                            </tfoot>
-                          )}
                         </table>
                       </div>
                     )
@@ -464,19 +504,36 @@ export default function InvoiceDetail() {
           )}
         </div>
 
-        {/* ── Totals ── */}
+        {/* ── Totals breakdown ── */}
         <div className="flex justify-end mb-6">
-          <div className="w-64 space-y-2 text-sm">
+          <div className="w-72 space-y-2 text-sm">
             <div className="flex justify-between">
+              <span className="text-gray-500">Seadmed</span>
+              <span>€{equipmentSubtotal.toFixed(2)}</span>
+            </div>
+            {discountPct > 0 && (
+              <div className="flex justify-between text-red-600">
+                <span>Allahindlus (-{discountPct}%)</span>
+                <span>−€{discountAmount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-gray-500">Teenused</span>
+              <span>€{serviceSubtotal.toFixed(2)}</span>
+            </div>
+            <div className="no-print flex justify-between items-center">
+              <span className="text-gray-500">Allahindlus %</span>
+              <input type="number" min="0" max="100" value={form.discount_pct} onChange={e => setForm(f => ({ ...f, discount_pct: parseFloat(e.target.value) || 0 }))} className="w-16 text-right border border-gray-200 rounded px-1 py-0.5 text-sm focus:outline-none" />
+            </div>
+            <div className="flex justify-between border-t border-gray-200 pt-2">
               <span className="text-gray-500">Vahesumma</span>
               <span>€{subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500">KM%</span>
+              <span className="text-gray-500">KM ({form.vat_rate}%)</span>
               <div className="flex items-center gap-1">
                 <input type="number" min="0" max="100" value={form.vat_rate} onChange={e => setForm(f => ({ ...f, vat_rate: parseFloat(e.target.value) || 0 }))} className="no-print w-14 text-right border border-gray-200 rounded px-1 py-0.5 text-sm focus:outline-none" />
-                <span className="print-only hidden">{form.vat_rate}%</span>
-                <span className="text-gray-500">= €{vatAmount.toFixed(2)}</span>
+                <span className="text-gray-500">€{vatAmount.toFixed(2)}</span>
               </div>
             </div>
             <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-2">

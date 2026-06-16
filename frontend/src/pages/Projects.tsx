@@ -94,6 +94,10 @@ export default function Projects() {
   const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
 
+  // Templates (create from template)
+  const [templates, setTemplates] = useState<{ id: number; name: string }[]>([])
+  const [useTemplateId, setUseTemplateId] = useState('')
+
   // Status management
   const [statuses, setStatuses] = useState<ProjectStatus[]>([])
   const [showStatusModal, setShowStatusModal] = useState(false)
@@ -127,6 +131,7 @@ export default function Projects() {
     fetchProjects()
     fetchStatuses()
     api.get('/clients').then((r) => setClients(r.data.clients || r.data || [])).catch(() => {})
+    api.get('/project-templates').then((r) => setTemplates(r.data || [])).catch(() => {})
   }, [fetchProjects, fetchStatuses])
 
   const getStatusLabel = (key: string) => {
@@ -154,20 +159,34 @@ export default function Projects() {
     e.preventDefault()
     setSaving(true)
     try {
-      const payload = {
-        name: form.name,
-        client_id: form.client_id ? Number(form.client_id) : undefined,
-        start_date: form.start_date,
-        end_date: form.end_date,
-        status: form.status,
-        budget: form.budget ? Number(form.budget) : undefined,
-        description: form.description,
+      let newId: number | undefined
+      if (useTemplateId) {
+        // Create from template
+        const res = await api.post(`/project-templates/${useTemplateId}/create-project`, {
+          name: form.name,
+          client_id: form.client_id ? Number(form.client_id) : undefined,
+          start_date: form.start_date || null,
+          end_date: form.end_date || null,
+        })
+        newId = res.data.id
+        toast.success('Projekt loodud mallist')
+      } else {
+        const payload = {
+          name: form.name,
+          client_id: form.client_id ? Number(form.client_id) : undefined,
+          start_date: form.start_date,
+          end_date: form.end_date,
+          status: form.status,
+          budget: form.budget ? Number(form.budget) : undefined,
+          description: form.description,
+        }
+        const res = await api.post('/projects', payload)
+        newId = res.data.id || res.data.project?.id
+        toast.success('Projekt loodud')
       }
-      const res = await api.post('/projects', payload)
-      toast.success('Projekt loodud')
       setShowModal(false)
       setForm({ ...EMPTY_FORM })
-      const newId = res.data.id || res.data.project?.id
+      setUseTemplateId('')
       if (newId) navigate(`/app/projects/${newId}`)
       else fetchProjects()
     } catch (err: any) {
@@ -282,7 +301,7 @@ export default function Projects() {
             <span className="hidden sm:inline">Olekud</span>
           </button>
           <button
-            onClick={() => { setForm({ ...EMPTY_FORM }); setShowModal(true) }}
+            onClick={() => { setForm({ ...EMPTY_FORM }); setUseTemplateId(''); setShowModal(true) }}
             className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             <PlusIcon className="h-4 w-4" />
@@ -471,6 +490,22 @@ export default function Projects() {
               </button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">
+              {templates.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Loo mallist</label>
+                  <select
+                    value={useTemplateId}
+                    onChange={(e) => setUseTemplateId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Tühi projekt (ilma mallita)</option>
+                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  {useTemplateId && (
+                    <p className="text-xs text-gray-400 mt-1">Mallist kopeeritakse etapid ja seadmed uude projekti.</p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Projekti nimi *</label>
                 <input

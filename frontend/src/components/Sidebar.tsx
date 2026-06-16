@@ -12,12 +12,15 @@ import {
   ChartBarIcon,
   XMarkIcon,
   TagIcon,
+  Square2StackIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 
 const navItems = [
   { label: 'Töölaud',     to: '/app/dashboard', icon: HomeIcon },
   { label: 'Projektid',   to: '/app/projects',  icon: FolderIcon },
+  { label: 'Mallid',      to: '/app/templates', icon: Square2StackIcon },
   { label: 'Seadmed',     to: '/app/equipment',   icon: CubeIcon },
   { label: 'Kategooriad', to: '/app/categories',  icon: TagIcon },
   { label: 'Meeskond',    to: '/app/crew',       icon: UsersIcon },
@@ -26,6 +29,7 @@ const navItems = [
   { label: 'Arved',       to: '/app/invoices',   icon: CurrencyEuroIcon },
   { label: 'Kliendid',    to: '/app/crm',        icon: BuildingOfficeIcon },
   { label: 'Analüütika',  to: '/app/analytics',  icon: ChartBarIcon },
+  { label: 'Kalendri seaded', to: '/app/calendar-settings', icon: Cog6ToothIcon },
 ]
 
 interface SidebarProps { open: boolean; onClose: () => void }

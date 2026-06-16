@@ -29,6 +29,8 @@ app.use('/api/clients', require('./routes/clients'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/project-statuses', require('./routes/projectStatuses'));
+app.use('/api/project-templates', require('./routes/projectTemplates'));
+app.use('/api/calendar-sync', require('./routes/calendarSync'));
 
 app.get('/api/health', async (req, res) => {
   try {

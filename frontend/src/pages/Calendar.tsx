@@ -116,9 +116,19 @@ function CalendarGrid({ year, month, projects, today, onDayClick }: CalendarGrid
   )
 }
 
+interface InventoryAvailability {
+  equipment_id: number
+  name: string
+  category_name: string | null
+  total_quantity: number
+  booked_qty: number
+  available_qty: number
+}
+
 export default function Calendar() {
   const navigate = useNavigate()
   const today = new Date()
+  const [view, setView] = useState<'events' | 'stock'>('events')
   const [currentYear, setCurrentYear] = useState(today.getFullYear())
   const [currentMonth, setCurrentMonth] = useState(today.getMonth())
   const [monthCount, setMonthCount] = useState(1)
@@ -126,9 +136,24 @@ export default function Calendar() {
   const [selectedDay, setSelectedDay] = useState<{ year: number; month: number; day: number } | null>(null)
   const [modalProjects, setModalProjects] = useState<Project[]>([])
 
+  // Stock calendar
+  const [stockDate, setStockDate] = useState(today.toISOString().split('T')[0])
+  const [stockData, setStockData] = useState<InventoryAvailability[]>([])
+  const [stockLoading, setStockLoading] = useState(false)
+
   useEffect(() => {
     api.get('/projects').then(r => setProjects(r.data.projects || r.data || [])).catch(() => toast.error('Projektide laadimine ebaõnnestus'))
   }, [])
+
+  useEffect(() => {
+    if (view === 'stock' && stockDate) {
+      setStockLoading(true)
+      api.get(`/inventory/availability?date=${stockDate}`)
+        .then(r => setStockData(Array.isArray(r.data) ? r.data : []))
+        .catch(() => toast.error('Saadavuse laadimine ebaõnnestus'))
+        .finally(() => setStockLoading(false))
+    }
+  }, [view, stockDate])
 
   function prevPeriod() {
     let m = currentMonth - monthCount
@@ -183,50 +208,135 @@ export default function Calendar() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Kalender</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1 text-xs">
-            {Object.entries(STATUS_COLORS).map(([s, c]) => (
-              <div key={s} className="flex items-center gap-1 mr-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c }}></div>
-                <span className="text-gray-500">{STATUS_LABELS[s] || s}</span>
-              </div>
+        {view === 'events' && (
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1 text-xs">
+              {Object.entries(STATUS_COLORS).map(([s, c]) => (
+                <div key={s} className="flex items-center gap-1 mr-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c }}></div>
+                  <span className="text-gray-500">{STATUS_LABELS[s] || s}</span>
+                </div>
+              ))}
+            </div>
+            {/* Month count toggle */}
+            <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden">
+              {[1, 2, 3].map(n => (
+                <button
+                  key={n}
+                  onClick={() => setMonthCount(n)}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${monthCount === n ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                  {n} {n === 1 ? 'kuu' : 'kuud'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* View tabs */}
+      <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden w-fit">
+        <button
+          onClick={() => setView('events')}
+          className={`px-4 py-1.5 text-sm font-medium transition-colors ${view === 'events' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+        >
+          Sündmused
+        </button>
+        <button
+          onClick={() => setView('stock')}
+          className={`px-4 py-1.5 text-sm font-medium transition-colors ${view === 'stock' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+        >
+          Varude kalender
+        </button>
+      </div>
+
+      {view === 'events' && (
+        <>
+          {/* Navigation header */}
+          <div className="flex items-center justify-between">
+            <button onClick={prevPeriod} className="p-2 rounded-lg hover:bg-gray-200 transition-colors text-gray-600 text-xl font-bold">‹</button>
+            <span className="text-base font-semibold text-gray-900">{rangeTitle}</span>
+            <button onClick={nextPeriod} className="p-2 rounded-lg hover:bg-gray-200 transition-colors text-gray-600 text-xl font-bold">›</button>
+          </div>
+
+          {/* Calendar grids */}
+          <div className={`grid gap-6 ${monthCount === 1 ? 'grid-cols-1' : monthCount === 2 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-3'}`}>
+            {visibleMonths.map(({ year, month }) => (
+              <CalendarGrid
+                key={`${year}-${month}`}
+                year={year}
+                month={month}
+                projects={projects}
+                today={today}
+                onDayClick={handleDayClick}
+              />
             ))}
           </div>
-          {/* Month count toggle */}
-          <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden">
-            {[1, 2, 3].map(n => (
-              <button
-                key={n}
-                onClick={() => setMonthCount(n)}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${monthCount === n ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-              >
-                {n} {n === 1 ? 'kuu' : 'kuud'}
-              </button>
-            ))}
+        </>
+      )}
+
+      {view === 'stock' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">Kuupäev</label>
+            <input
+              type="date"
+              value={stockDate}
+              onChange={e => setStockDate(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {stockLoading ? (
+              <div className="p-8 text-center text-gray-400 text-sm">Laen...</div>
+            ) : stockData.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-sm">Seadmeid ei leitud</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Seade</th>
+                    <th className="px-4 py-3 text-left">Kategooria</th>
+                    <th className="px-4 py-3 text-center">Kokku</th>
+                    <th className="px-4 py-3 text-center">Broneeritud</th>
+                    <th className="px-4 py-3 text-center">Saadaval</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {stockData.map(item => {
+                    const avail = Number(item.available_qty)
+                    const total = Number(item.total_quantity)
+                    const overbooked = avail < 0
+                    const availClass = overbooked
+                      ? 'bg-red-100 text-red-700'
+                      : avail === total
+                      ? 'bg-green-100 text-green-700'
+                      : avail > 0
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+                    return (
+                      <tr key={item.equipment_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium">{item.name}</td>
+                        <td className="px-4 py-3 text-gray-500">{item.category_name || '—'}</td>
+                        <td className="px-4 py-3 text-center">{total}</td>
+                        <td className="px-4 py-3 text-center">{Number(item.booked_qty)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${availClass}`}>
+                            {avail}
+                          </span>
+                          {overbooked && (
+                            <span className="ml-2 text-xs text-red-600 font-medium">Üle broneeritud!</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-      </div>
-
-      {/* Navigation header */}
-      <div className="flex items-center justify-between">
-        <button onClick={prevPeriod} className="p-2 rounded-lg hover:bg-gray-200 transition-colors text-gray-600 text-xl font-bold">‹</button>
-        <span className="text-base font-semibold text-gray-900">{rangeTitle}</span>
-        <button onClick={nextPeriod} className="p-2 rounded-lg hover:bg-gray-200 transition-colors text-gray-600 text-xl font-bold">›</button>
-      </div>
-
-      {/* Calendar grids */}
-      <div className={`grid gap-6 ${monthCount === 1 ? 'grid-cols-1' : monthCount === 2 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-3'}`}>
-        {visibleMonths.map(({ year, month }) => (
-          <CalendarGrid
-            key={`${year}-${month}`}
-            year={year}
-            month={month}
-            projects={projects}
-            today={today}
-            onDayClick={handleDayClick}
-          />
-        ))}
-      </div>
+      )}
 
       {selectedDay && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedDay(null)}>

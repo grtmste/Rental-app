@@ -1,6 +1,28 @@
 const pool = require('../config/database');
 const { sendQuoteEmail } = require('../utils/emailService');
 
+// Compute totals with equipment-only discount.
+// equipmentSubtotal = sum(line_total where item_type='equipment')
+// discountAmount = equipmentSubtotal * discount_pct/100
+// serviceSubtotal = sum(line_total where item_type != 'equipment')
+// subtotal = (equipmentSubtotal - discountAmount) + serviceSubtotal
+function computeTotals(items, vatRate, discountPct) {
+  let equipmentSubtotal = 0;
+  let serviceSubtotal = 0;
+  const processed = (items || []).map(item => {
+    const lineTotal = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
+    const type = item.item_type || 'equipment';
+    if (type === 'equipment') equipmentSubtotal += lineTotal;
+    else serviceSubtotal += lineTotal;
+    return { ...item, line_total: lineTotal, item_type: type };
+  });
+  const discountAmount = equipmentSubtotal * ((parseFloat(discountPct) || 0) / 100);
+  const subtotal = (equipmentSubtotal - discountAmount) + serviceSubtotal;
+  const vatAmount = subtotal * ((parseFloat(vatRate) || 0) / 100);
+  const total = subtotal + vatAmount;
+  return { processed, subtotal, vatAmount, total };
+}
+
 const getAll = async (req, res, next) => {
   try {
     const result = await pool.query(`
@@ -22,9 +44,11 @@ const getOne = async (req, res, next) => {
     const { id } = req.params;
 
     const quoteResult = await pool.query(`
-      SELECT q.*, c.name AS client_name, c.company AS client_company, c.email AS client_email, c.phone AS client_phone, c.address AS client_address
+      SELECT q.*, c.name AS client_name, c.company AS client_company, c.email AS client_email, c.phone AS client_phone, c.address AS client_address,
+             p.name AS project_name
       FROM quotes q
       LEFT JOIN clients c ON q.client_id = c.id
+      LEFT JOIN projects p ON q.project_id = p.id
       WHERE q.id = $1
     `, [id]);
 
@@ -72,14 +96,22 @@ const create = async (req, res, next) => {
       due_date,
       notes,
       vat_rate,
+      discount_pct,
       items,
     } = req.body;
+    let { event_name } = req.body;
 
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required.' });
     }
 
     await client.query('BEGIN');
+
+    // Default event_name to project name when created from a project
+    if (!event_name && project_id) {
+      const projRes = await client.query('SELECT name FROM projects WHERE id = $1', [project_id]);
+      if (projRes.rows.length > 0) event_name = projRes.rows[0].name;
+    }
 
     // Generate quote number
     const countResult = await client.query('SELECT COUNT(*) FROM quotes');
@@ -88,25 +120,17 @@ const create = async (req, res, next) => {
     const validStatuses = ['draft', 'sent', 'accepted', 'declined'];
     const quoteStatus = validStatuses.includes(status) ? status : 'draft';
     const vatRate = parseFloat(vat_rate) || 20;
+    const discountPct = parseFloat(discount_pct) || 0;
 
-    // Calculate totals from items
-    let subtotal = 0;
-    const processedItems = (items || []).map(item => {
-      const lineTotal = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
-      subtotal += lineTotal;
-      return { ...item, line_total: lineTotal };
-    });
-
-    const vatAmount = subtotal * (vatRate / 100);
-    const total = subtotal + vatAmount;
+    const { processed: processedItems, subtotal, vatAmount, total } = computeTotals(items, vatRate, discountPct);
 
     const quoteResult = await client.query(
-      `INSERT INTO quotes (quote_number, project_id, client_id, status, date, due_date, notes, subtotal, vat_rate, vat_amount, total)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO quotes (quote_number, project_id, client_id, status, date, due_date, notes, event_name, discount_pct, subtotal, vat_rate, vat_amount, total)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [quoteNumber, project_id || null, client_id, quoteStatus,
         date || new Date().toISOString().split('T')[0],
-        due_date || null, notes || null,
+        due_date || null, notes || null, event_name || null, discountPct,
         subtotal, vatRate, vatAmount, total]
     );
 
@@ -114,9 +138,9 @@ const create = async (req, res, next) => {
 
     for (const item of processedItems) {
       await client.query(
-        `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total, category_name, stage_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [quote.id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total, item.category_name || null, item.stage_name || null]
+        `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total, category_name, stage_name, item_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [quote.id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total, item.category_name || null, item.stage_name || null, item.item_type || 'equipment']
       );
     }
 
@@ -147,6 +171,8 @@ const update = async (req, res, next) => {
       due_date,
       notes,
       vat_rate,
+      discount_pct,
+      event_name,
       items,
     } = req.body;
 
@@ -161,29 +187,30 @@ const update = async (req, res, next) => {
     let subtotal = null;
     let vatAmount = null;
     let total = null;
-    let vatRate = vat_rate ? parseFloat(vat_rate) : null;
+    let vatRate = vat_rate !== undefined && vat_rate !== null ? parseFloat(vat_rate) : null;
+    const discountPct = discount_pct !== undefined && discount_pct !== null ? parseFloat(discount_pct) : null;
 
     if (items !== undefined) {
-      subtotal = 0;
-      const processedItems = (items || []).map(item => {
-        const lineTotal = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
-        subtotal += lineTotal;
-        return { ...item, line_total: lineTotal };
-      });
-
       if (vatRate === null) {
         const currentQuote = await dbClient.query('SELECT vat_rate FROM quotes WHERE id = $1', [id]);
         vatRate = parseFloat(currentQuote.rows[0].vat_rate);
       }
-      vatAmount = subtotal * (vatRate / 100);
-      total = subtotal + vatAmount;
+      let effectiveDiscount = discountPct;
+      if (effectiveDiscount === null) {
+        const currentQuote = await dbClient.query('SELECT discount_pct FROM quotes WHERE id = $1', [id]);
+        effectiveDiscount = parseFloat(currentQuote.rows[0].discount_pct) || 0;
+      }
+      const computed = computeTotals(items, vatRate, effectiveDiscount);
+      subtotal = computed.subtotal;
+      vatAmount = computed.vatAmount;
+      total = computed.total;
 
       await dbClient.query('DELETE FROM quote_items WHERE quote_id = $1', [id]);
-      for (const item of processedItems) {
+      for (const item of computed.processed) {
         await dbClient.query(
-          `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total, category_name, stage_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total, item.category_name || null, item.stage_name || null]
+          `INSERT INTO quote_items (quote_id, description, quantity, unit_price, line_total, category_name, stage_name, item_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, item.description, item.quantity || 1, item.unit_price || 0, item.line_total, item.category_name || null, item.stage_name || null, item.item_type || 'equipment']
         );
       }
     }
@@ -199,10 +226,12 @@ const update = async (req, res, next) => {
            subtotal = COALESCE($7, subtotal),
            vat_rate = COALESCE($8, vat_rate),
            vat_amount = COALESCE($9, vat_amount),
-           total = COALESCE($10, total)
-       WHERE id = $11
+           total = COALESCE($10, total),
+           discount_pct = COALESCE($11, discount_pct),
+           event_name = COALESCE($12, event_name)
+       WHERE id = $13
        RETURNING *`,
-      [project_id, client_id, status, date, due_date, notes, subtotal, vatRate, vatAmount, total, id]
+      [project_id, client_id, status, date, due_date, notes, subtotal, vatRate, vatAmount, total, discountPct, event_name !== undefined ? event_name : null, id]
     );
 
     await dbClient.query('COMMIT');

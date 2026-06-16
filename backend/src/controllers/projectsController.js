@@ -1,4 +1,21 @@
 const pool = require('../config/database');
+const googleCalendar = require('../utils/googleCalendar');
+
+// Fire-and-await calendar sync, but never let a sync failure break the request.
+async function safeSyncProject(projectId) {
+  try {
+    await googleCalendar.syncProject(projectId);
+  } catch (err) {
+    console.error('Calendar sync error (project):', err.message);
+  }
+}
+async function safeDeleteProjectEvents(projectId) {
+  try {
+    await googleCalendar.deleteProjectEvents(projectId);
+  } catch (err) {
+    console.error('Calendar sync error (delete):', err.message);
+  }
+}
 
 const getAll = async (req, res, next) => {
   try {
@@ -84,6 +101,7 @@ const create = async (req, res, next) => {
       [name, client_id || null, start_date || null, end_date || null, projectStatus, budget || null, description || null]
     );
 
+    await safeSyncProject(result.rows[0].id);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -114,6 +132,7 @@ const update = async (req, res, next) => {
       [name, client_id, start_date, end_date, status, budget, description, id]
     );
 
+    await safeSyncProject(id);
     res.json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -129,6 +148,7 @@ const remove = async (req, res, next) => {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
+    await safeDeleteProjectEvents(id);
     await pool.query('DELETE FROM projects WHERE id = $1', [id]);
     res.json({ message: 'Project deleted successfully.' });
   } catch (err) {
@@ -403,6 +423,7 @@ const addCrew = async (req, res, next) => {
       [id, crew_member_id, role || null, hours || null, rate_per_hour || null]
     );
 
+    await safeSyncProject(id);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -450,6 +471,7 @@ const removeCrew = async (req, res, next) => {
     }
 
     await pool.query('DELETE FROM project_crew_members WHERE id = $1', [memberId]);
+    await safeSyncProject(id);
     res.json({ message: 'Crew member removed from project.' });
   } catch (err) {
     next(err);
