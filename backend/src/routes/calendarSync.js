@@ -57,6 +57,44 @@ router.put('/members/:userId', auth, async (req, res, next) => {
   }
 });
 
+// POST /api/calendar-sync/sync-all
+// Syncs every project to Google Calendar. Returns counts of success/failure.
+router.post('/sync-all', auth, async (req, res, next) => {
+  try {
+    if (!isEnabled()) {
+      return res.json({ ok: false, message: 'GOOGLE_CALENDAR_ENABLED on puudu või ei ole "true".' });
+    }
+    const settings = await getSettings();
+    if (!settings || !settings.enabled || !settings.master_calendar_id) {
+      return res.json({ ok: false, message: 'Sünkroonimine on seadetest välja lülitatud või peakalendri ID puudub.' });
+    }
+
+    const projects = await pool.query('SELECT id, name FROM projects ORDER BY id');
+    let succeeded = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (const p of projects.rows) {
+      try {
+        await syncProject(p.id);
+        succeeded++;
+      } catch (err) {
+        failed++;
+        errors.push(`${p.name}: ${err.message}`);
+      }
+    }
+
+    const total = projects.rows.length;
+    if (failed === 0) {
+      res.json({ ok: true, message: `Kõik ${total} projekti sünkroonitud edukalt.` });
+    } else {
+      res.json({ ok: false, message: `${succeeded}/${total} õnnestus. Vead: ${errors.join('; ')}` });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/calendar-sync/test-connection
 // Runs a real sync on the most recent project and returns detailed success/error info.
 router.post('/test-connection', auth, async (req, res, next) => {
