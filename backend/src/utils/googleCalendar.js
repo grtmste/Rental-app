@@ -54,14 +54,20 @@ async function getSettings() {
 // Build the Google event resource body for a project.
 // Google Calendar requires both start and end; end must be strictly after start.
 function buildEventBody(project) {
+  function toDateStr(val) {
+    if (!val) return null;
+    const d = val instanceof Date ? val : new Date(val);
+    return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+  }
+
   const today = new Date().toISOString().split('T')[0];
-  const startDate = project.start_date ? String(project.start_date).split('T')[0] : today;
-  let endDate = project.end_date ? String(project.end_date).split('T')[0] : startDate;
+  const startDate = toDateStr(project.start_date) || today;
+  let endDate = toDateStr(project.end_date) || startDate;
 
   // For all-day events the end date is exclusive, so it must be > start.
   if (endDate <= startDate) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + 1);
+    const d = new Date(startDate + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 1);
     endDate = d.toISOString().split('T')[0];
   }
 
