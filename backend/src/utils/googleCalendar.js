@@ -64,9 +64,10 @@ function buildEventBody(project) {
   const startDate = toDateStr(project.start_date) || today;
   let endDate = toDateStr(project.end_date) || startDate;
 
-  // For all-day events the end date is exclusive, so it must be > start.
-  if (endDate <= startDate) {
-    const d = new Date(startDate + 'T00:00:00Z');
+  // For all-day events Google treats the end date as EXCLUSIVE, so to show the
+  // project's last day inclusively we add one day. This also guarantees end > start.
+  {
+    const d = new Date((endDate < startDate ? startDate : endDate) + 'T00:00:00Z');
     d.setUTCDate(d.getUTCDate() + 1);
     endDate = d.toISOString().split('T')[0];
   }
